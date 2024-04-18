@@ -7,7 +7,7 @@ import com.creatorjohn.helpers.powerups.PowerUp;
 
 import java.util.List;
 
-final public class UpdateGameEvent extends Event {
+final public class UpdateGameEvent extends Event implements ClientEvent {
     final public List<Position> tilesShot;
     final public List<PowerUp> usedPowerUps;
 

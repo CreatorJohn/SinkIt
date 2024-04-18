@@ -1,6 +1,6 @@
 package com.creatorjohn.helpers.events;
 
-final public class GameCreatedEvent extends Event {
+final public class GameCreatedEvent extends Event implements ServerEvent {
     final public String gameID;
 
     public GameCreatedEvent(String gameID) {

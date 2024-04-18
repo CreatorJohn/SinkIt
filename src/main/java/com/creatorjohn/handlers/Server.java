@@ -2,6 +2,8 @@ package com.creatorjohn.handlers;
 
 import com.creatorjohn.helpers.server.Game;
 import com.creatorjohn.helpers.server.Player;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -12,6 +14,7 @@ public class Server {
     private ServerSocket instance;
     private Thread thread;
     final private HashMap<String, Player> players = new HashMap<>();
+    final private HashMap<String, Thread> playerThreads = new HashMap<>();
     final private HashMap<String, Game> games = new HashMap<>();
 
     synchronized public boolean open(int port) {
@@ -22,9 +25,10 @@ public class Server {
             thread = new Thread(() -> {
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
-                        Player player = new Player(instance);
+                        Player player = Player.create(instance, this);
 
-                        if (!joinPlayer(player)) System.err.println("Server >> User is already connected!");
+                        if (player == null) System.err.println("Server >> Failed to connect user!");
+                        else if (!joinPlayer(player)) System.err.println("Server >> User is already connected!");
                         else System.out.println("Server >> User " + player.id() + " connected!");
                     } catch (Exception e) {
                         System.err.println("Server >> " + e.getLocalizedMessage());
@@ -40,7 +44,29 @@ public class Server {
         }
     }
 
-    public boolean joinPlayer(Player player) {
+    public String createGame(@NotNull Player host) {
+        Game created = Game.create(host, this);
+
+        games.put(created.id(), created);
+
+        return created.id();
+    }
+
+    @Nullable
+    public Game findGame(@NotNull String id) {
+        return games.get(id);
+    }
+
+    public boolean deleteGame(@NotNull Game game) {
+        if (games.isEmpty()) return false;
+        else if (!games.containsKey(game.id())) return false;
+
+        games.remove(game.id());
+
+        return true;
+    }
+
+    public boolean joinPlayer(@NotNull Player player) {
         if (players.containsKey(player.id())) return false;
 
         players.put(player.id(), player);
@@ -48,9 +74,10 @@ public class Server {
         return true;
     }
 
-    public boolean disconnectPlayer(Player player) {
+    public boolean disconnectPlayer(@NotNull Player player) {
         if (!players.containsKey(player.id())) return false;
 
+        player.disconnect();
         players.remove(player.id());
 
         return true;

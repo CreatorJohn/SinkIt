@@ -1,10 +1,8 @@
 package com.creatorjohn.helpers.events;
 
-final public class DisconnectEvent extends Event {
-    final public String gameID;
+final public class DisconnectEvent extends Event implements ClientEvent {
 
-    public DisconnectEvent(String gameID) {
+    public DisconnectEvent() {
         super(Type.DISCONNECT);
-        this.gameID = gameID;
     }
 }

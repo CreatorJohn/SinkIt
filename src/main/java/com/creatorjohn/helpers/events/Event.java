@@ -1,18 +1,8 @@
 package com.creatorjohn.helpers.events;
 
-import com.creatorjohn.helpers.GameBoard;
-import com.creatorjohn.helpers.Position;
 import com.creatorjohn.helpers.json.MyGson;
-import com.creatorjohn.helpers.powerups.Bomb;
-import com.creatorjohn.helpers.powerups.Farm;
-import com.creatorjohn.helpers.powerups.PowerUp;
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
 
-import java.sql.SQLOutput;
-import java.util.List;
-
-public sealed class Event permits CreateGameEvent, DisconnectEvent, GameCreatedEvent, GameFinishedEvent, InitializeGameEvent, JoinGameEvent, NextRound, UpdateGameEvent {
+public sealed class Event permits CreateGameEvent, DisconnectEvent, GameCreatedEvent, GameFinishedEvent, InitializeGameEvent, JoinGameEvent, GameUpdatedEvent, PlayerJoinedEvent, PlayerLeftEvent, UpdateGameEvent {
     final private Type type;
 
     public Event(Type type) {
@@ -23,8 +13,10 @@ public sealed class Event permits CreateGameEvent, DisconnectEvent, GameCreatedE
         CREATE_GAME,
         GAME_CREATED,
         JOIN_GAME,
+        PLAYER_JOINED,
+        PLAYER_LEFT,
         INITIALIZE_GAME,
-        NEXT_ROUND,
+        GAME_UPDATED,
         UPDATE_GAME,
         GAME_FINISHED,
         DISCONNECT,

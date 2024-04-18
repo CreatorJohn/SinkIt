@@ -1,5 +1,10 @@
 package com.creatorjohn.helpers.server;
 
+import com.creatorjohn.handlers.Server;
+import com.creatorjohn.helpers.events.*;
+import com.creatorjohn.helpers.json.MyGson;
+import org.jetbrains.annotations.NotNull;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -9,23 +14,30 @@ import java.net.Socket;
 
 public class Player {
     final private String id;
+    final private Server server;
     final private Socket instance;
     final private PrintWriter out;
     final private BufferedReader in;
-    private boolean connected = false;
+    private boolean connected;
     private String gameID;
+    private Thread thread;
 
-    public Player(ServerSocket server) throws Exception {
+    public static Player create(ServerSocket server, Server parent) {
         try {
-            instance = server.accept();
-            out = new PrintWriter(instance.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(instance.getInputStream()));
-            id = instance.getRemoteSocketAddress().toString();
-            connected = true;
+            return new Player(server, parent);
         } catch (IOException e) {
-            printError(e);
-            throw new Exception(e.getLocalizedMessage());
+            System.err.println("Player >> " + e.getLocalizedMessage());
+            return null;
         }
+    }
+
+    private Player(ServerSocket server, Server parent) throws IOException {
+        this.server = parent;
+        this.instance = server.accept();
+        this.out = new PrintWriter(instance.getOutputStream(), true);
+        this.in = new BufferedReader(new InputStreamReader(instance.getInputStream()));
+        this.id = instance.getRemoteSocketAddress().toString();
+        this.connected = true;
     }
 
     public String id() {
@@ -40,14 +52,74 @@ public class Player {
         return true;
     }
 
+    private void listen() {
+        thread = new Thread(() -> {
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    String incoming = in.readLine();
+                    ClientEvent event = (ClientEvent) MyGson.instance.fromJson(incoming, Event.class);
+
+                    switch (event) {
+                        case CreateGameEvent ignored -> {
+                            if (this.gameID != null) break;
+
+                            String gameID = server.createGame(this);
+                            this.gameID = gameID;
+                            sendEvent(new GameCreatedEvent(gameID));
+                        }
+                        case JoinGameEvent ev -> {
+                            if (this.gameID != null || ev.gameID == null) break;
+
+                            Game game = server.findGame(ev.gameID);
+
+                            if (game == null) break;
+
+                            this.gameID = game.id();
+                            Player enemy = game.player(game.id());
+
+                            if (enemy == null) break;
+
+                            enemy.sendEvent(new PlayerJoinedEvent());
+                        }
+                        case DisconnectEvent ignored -> {
+                            if (this.gameID == null) break;
+
+                            Game game = server.findGame(this.gameID);
+
+                            if (game == null) break;
+
+                            Player enemy = game.player(this.gameID);
+                            game.removePlayer(this);
+                            this.gameID = null;
+
+                            if (enemy == null) break;
+
+                            enemy.sendEvent(new PlayerLeftEvent());
+                        }
+                        case null, default -> System.err.println("Player >> Unknown command!");
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Player >> " + e.getLocalizedMessage());
+            }
+        });
+        thread.start();
+    }
+
+    private void sendEvent(ServerEvent event) {
+
+    }
+
     public void disconnect() {
-        if (connected) return;
+        if (!connected) return;
 
         try {
-            out.close();
-            in.close();
-            instance.close();
-            connected = false;
+            this.out.close();
+            this.in.close();
+            this.instance.close();
+            this.thread.interrupt();
+            this.connected = false;
+            this.gameID = null;
         } catch (IOException e) {
             printError(e);
         }
