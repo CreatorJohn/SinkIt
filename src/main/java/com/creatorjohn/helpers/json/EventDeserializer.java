@@ -23,7 +23,7 @@ public class EventDeserializer implements JsonDeserializer<Event> {
         Event out;
 
         switch (type) {
-            case CREATE_GAME -> out = new CreateGameEvent(obj.get("gameID").getAsString());
+            case CREATE_GAME -> out = new CreateGameEvent();
             case GAME_CREATED -> {
                 if (JConfig.isNotPrimitive(obj.get("gameID"))) out = null;
                 else out = new GameCreatedEvent(obj.get("gameID").getAsString());
@@ -31,6 +31,19 @@ public class EventDeserializer implements JsonDeserializer<Event> {
             case JOIN_GAME -> {
                 if (JConfig.isNotPrimitive(obj.get("gameID"))) out = null;
                 else out = new JoinGameEvent(obj.get("gameID").getAsString());
+            }
+            case GAME_JOINED -> {
+                if (JConfig.isNotArray(obj.get("ships"))) out = null;
+                else if (JConfig.isNotArray(obj.get("powerUps"))) out = null;
+                else if (JConfig.isNotArray(obj.get("shotTiles"))) out = null;
+                else if (JConfig.isNotArray(obj.get("revealedTiles"))) out = null;
+                else {
+                    List<Ship> ships = JConfig.convertArray("ships", obj, Ship.class);
+                    List<PowerUp> powerUps = JConfig.convertArray("powerUps", obj, PowerUp.class);
+                    List<Position> shotTiles = JConfig.convertArray("shotTiles", obj, Position.class);
+                    List<Position> revealedTiles = JConfig.convertArray("revealedTiles", obj, Position.class);
+                    out = new GameJoinedEvent(ships, powerUps, shotTiles, revealedTiles);
+                }
             }
             case PLAYER_JOINED -> out = new PlayerJoinedEvent();
             case PLAYER_LEFT -> out = new PlayerLeftEvent();
@@ -48,17 +61,11 @@ public class EventDeserializer implements JsonDeserializer<Event> {
             }
             case GAME_UPDATED -> {
                 if (JConfig.isNotPrimitive(obj.get("currentPlayer"))) out = null;
-                else if (JConfig.isNotArray(obj.get("ships"))) out = null;
-                else if (JConfig.isNotArray(obj.get("powerUps"))) out = null;
-                else if (JConfig.isNotArray(obj.get("revealedTiles"))) out = null;
                 else if (JConfig.isNotArray(obj.get("shotTiles"))) out = null;
                 else {
                     String currentPlayer = obj.get("currentPlayer").getAsString();
-                    List<Ship> ships = JConfig.convertArray("ships", obj, Ship.class);
-                    List<PowerUp> powerUps = JConfig.convertArray("powerUps", obj, PowerUp.class);
-                    List<Position> revealedTiles = JConfig.convertArray("revealedTiles", obj, Position.class);
                     List<Position> shotTiles = JConfig.convertArray("shotTiles", obj, Position.class);
-                    out = new GameUpdatedEvent(currentPlayer, ships, powerUps, revealedTiles, shotTiles);
+                    out = new GameUpdatedEvent(currentPlayer, shotTiles);
                 }
             }
             case GAME_FINISHED -> {

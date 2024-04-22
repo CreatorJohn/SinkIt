@@ -1,5 +1,6 @@
 package com.creatorjohn.handlers;
 
+import com.creatorjohn.helpers.logging.MyLogger;
 import com.creatorjohn.helpers.server.Game;
 import com.creatorjohn.helpers.server.Player;
 import org.jetbrains.annotations.NotNull;
@@ -11,10 +12,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class Server {
+    final private MyLogger logger = new MyLogger("Server");
     private ServerSocket instance;
     private Thread thread;
     final private HashMap<String, Player> players = new HashMap<>();
-    final private HashMap<String, Thread> playerThreads = new HashMap<>();
     final private HashMap<String, Game> games = new HashMap<>();
 
     synchronized public boolean open(int port) {
@@ -27,11 +28,12 @@ public class Server {
                     try {
                         Player player = Player.create(instance, this);
 
-                        if (player == null) System.err.println("Server >> Failed to connect user!");
-                        else if (!joinPlayer(player)) System.err.println("Server >> User is already connected!");
-                        else System.out.println("Server >> User " + player.id() + " connected!");
+                        if (instance == null) logger.info("Server closed!");
+                        else if (player == null) logger.severe("Failed to connect user!");
+                        else if (!joinPlayer(player)) logger.severe("User is already connected!");
+                        else logger.fine("User " + player.id() + " connected!");
                     } catch (Exception e) {
-                        System.err.println("Server >> " + e.getLocalizedMessage());
+                        logger.severe(e.getLocalizedMessage());
                     }
                 }
             });
@@ -39,12 +41,12 @@ public class Server {
 
             return true;
         } catch (IOException e) {
-            System.err.println("Server >> " + e.getLocalizedMessage());
+            logger.severe(e.getLocalizedMessage());
             return false;
         }
     }
 
-    public String createGame(@NotNull Player host) {
+    synchronized public String createGame(@NotNull Player host) {
         Game created = Game.create(host, this);
 
         games.put(created.id(), created);
@@ -53,20 +55,15 @@ public class Server {
     }
 
     @Nullable
-    public Game findGame(@NotNull String id) {
+    synchronized public Game findGame(@NotNull String id) {
         return games.get(id);
     }
 
-    public boolean deleteGame(@NotNull Game game) {
-        if (games.isEmpty()) return false;
-        else if (!games.containsKey(game.id())) return false;
-
+    synchronized public void deleteGame(@NotNull Game game) {
         games.remove(game.id());
-
-        return true;
     }
 
-    public boolean joinPlayer(@NotNull Player player) {
+    synchronized public boolean joinPlayer(@NotNull Player player) {
         if (players.containsKey(player.id())) return false;
 
         players.put(player.id(), player);
@@ -74,28 +71,25 @@ public class Server {
         return true;
     }
 
-    public boolean disconnectPlayer(@NotNull Player player) {
+    synchronized public boolean disconnectPlayer(@NotNull Player player) {
         if (!players.containsKey(player.id())) return false;
 
-        player.disconnect();
         players.remove(player.id());
+        player.disconnect();
 
         return true;
     }
 
-    synchronized public boolean close() {
-        if (instance == null) return false;
+    synchronized public void close() {
+        if (instance == null) return;
 
         try {
             thread.interrupt();
             instance.close();
             instance = null;
             thread = null;
-
-            return true;
         } catch (IOException e) {
-            System.err.println("Server >> " + e.getLocalizedMessage());
-            return false;
+            logger.severe(e.getLocalizedMessage());
         }
     }
 }

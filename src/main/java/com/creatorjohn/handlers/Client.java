@@ -2,19 +2,20 @@ package com.creatorjohn.handlers;
 
 import com.creatorjohn.helpers.events.*;
 import com.creatorjohn.helpers.json.MyGson;
+import com.creatorjohn.helpers.logging.MyLogger;
 
+import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 
 public class Client {
+    final private static MyLogger logger = new MyLogger("Client");
     final private Socket instance;
     final private BufferedReader in;
     final private PrintWriter out;
     private Thread thread;
-    private EventHandlerConfig config;
 
     private Client(String address, int port) throws IOException {
         this.instance = new Socket(address, port);
@@ -26,40 +27,40 @@ public class Client {
         try {
             return new Client(address, port);
         } catch (IOException e) {
-            System.err.println("Client >> " + e.getLocalizedMessage());
+            logger.severe(e.getLocalizedMessage());
             return null;
         }
     }
 
-    public void setEventHandler(EventHandlerConfig config) {
-        this.config = config;
+    public String id() {
+        return instance.getLocalSocketAddress().toString();
     }
 
-    public boolean sendEvent(ClientEvent event) {
-        if (out == null) return false;
-
+    public void sendEvent(ClientEvent event) {
         out.println(MyGson.instance.toJson(event));
-        return true;
     }
 
-    public void handleIncomingEvents() {
+    public void handleIncomingEvents(EventHandlerConfig config) {
         this.thread = new Thread(() -> {
             try {
-                while (!Thread.currentThread().isInterrupted()) {
-                    String incoming = in.readLine();
+                String incoming;
+                while ((incoming = in.readLine()) != null) {
                     ServerEvent event = (ServerEvent) MyGson.instance.fromJson(incoming, Event.class);
 
                     switch (event) {
                         case GameCreatedEvent ev -> config.onGameCreated(ev);
+                        case GameJoinedEvent ev -> config.onGameJoined(ev);
                         case GameUpdatedEvent ev -> config.onGameUpdated(ev);
                         case GameFinishedEvent ev -> config.onGameFinished(ev);
                         case PlayerJoinedEvent ev -> config.onPlayerJoined(ev);
                         case PlayerLeftEvent ev -> config.onPlayerLeft(ev);
-                        case null, default -> System.err.println("Client >> Unknown event!");
+                        case null, default -> logger.warning("Unknown event!");
                     }
                 }
             } catch (IOException e) {
-                System.out.println("Client >> Incoming event handling finished!");
+                logger.info("Player disconnected!");
+            } catch (Exception e) {
+                logger.severe(e.getLocalizedMessage());
             }
         });
         thread.start();
@@ -67,20 +68,19 @@ public class Client {
 
     public boolean disconnect() {
         try {
-            this.in.close();
-            this.out.close();
-            this.instance.close();
             this.thread.interrupt();
+            this.instance.close();
 
             return true;
         } catch (IOException e) {
-            System.err.println("Client >> " + e.getLocalizedMessage());
+            logger.info("Failed to close player!");
             return false;
         }
     }
 
     public interface EventHandlerConfig {
         void onGameCreated(GameCreatedEvent event);
+        void onGameJoined(GameJoinedEvent event);
         void onGameFinished(GameFinishedEvent event);
         void onGameUpdated(GameUpdatedEvent event);
         void onPlayerJoined(PlayerJoinedEvent event);

@@ -41,7 +41,7 @@ public class GameBoard {
         this.allPositions = positions;
     }
 
-    public boolean updateGame(UpdateGameEvent event) {
+    public boolean updateGameBoard(UpdateGameEvent event) {
         boolean powerUpsUsed = event.usedPowerUps.stream().allMatch(powerUp -> {
             switch (powerUp) {
                 case Bomb bomb -> { return useBombPowerUp(bomb); }

@@ -1,9 +1,12 @@
 package com.creatorjohn.helpers.server;
 
 import com.creatorjohn.handlers.Server;
+import com.creatorjohn.helpers.Position;
+import com.creatorjohn.helpers.Ship;
 import com.creatorjohn.helpers.events.*;
 import com.creatorjohn.helpers.json.MyGson;
-import org.jetbrains.annotations.NotNull;
+import com.creatorjohn.helpers.logging.MyLogger;
+import com.creatorjohn.helpers.powerups.PowerUp;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -11,8 +14,12 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.util.List;
+import java.util.Objects;
 
 public class Player {
+    static final private MyLogger logger = new MyLogger("Player");
     final private String id;
     final private Server server;
     final private Socket instance;
@@ -26,7 +33,7 @@ public class Player {
         try {
             return new Player(server, parent);
         } catch (IOException e) {
-            System.err.println("Player >> " + e.getLocalizedMessage());
+            logger.severe(e.getLocalizedMessage());
             return null;
         }
     }
@@ -38,84 +45,133 @@ public class Player {
         this.in = new BufferedReader(new InputStreamReader(instance.getInputStream()));
         this.id = instance.getRemoteSocketAddress().toString();
         this.connected = true;
+        this.listen();
     }
 
     public String id() {
         return id;
     }
 
-    public boolean joinGame(String gameID) {
-        if (this.gameID != null || gameID == null) return false;
-
-        this.gameID = gameID;
-
-        return true;
-    }
-
     private void listen() {
         thread = new Thread(() -> {
             try {
-                while (!Thread.currentThread().isInterrupted()) {
-                    String incoming = in.readLine();
+                String incoming;
+                while ((incoming = in.readLine()) != null) {
                     ClientEvent event = (ClientEvent) MyGson.instance.fromJson(incoming, Event.class);
+                    System.out.println("Server >> Event: " + event);
 
                     switch (event) {
                         case CreateGameEvent ignored -> {
-                            if (this.gameID != null) break;
+                            if (this.gameID != null) {
+                                logger.warning("Player is already in game!");
+                                break;
+                            }
 
                             String gameID = server.createGame(this);
                             this.gameID = gameID;
                             sendEvent(new GameCreatedEvent(gameID));
                         }
                         case JoinGameEvent ev -> {
-                            if (this.gameID != null || ev.gameID == null) break;
+                            if (this.gameID != null) {
+                                logger.warning("Player is already in game!");
+                                break;
+                            } else if (ev.gameID == null) {
+                                logger.severe("Invalid gameID!");
+                                break;
+                            }
 
                             Game game = server.findGame(ev.gameID);
 
-                            if (game == null) break;
+                            if (game == null) {
+                                logger.severe("Game doesn't exist!");
+                                break;
+                            }
 
-                            this.gameID = game.id();
-                            Player enemy = game.player(game.id());
+                            if (game.addPlayer(this)) this.gameID = game.id();
+                            else return;
 
-                            if (enemy == null) break;
+                            Player enemy = game.enemy(id());
+
+                            if (enemy == null) {
+                                logger.severe("Enemy not found!");
+                                break;
+                            }
 
                             enemy.sendEvent(new PlayerJoinedEvent());
+                            System.out.println("Player " + id() + " joined the game!");
+
+                            List<Ship> loadedShips = game.ships(id());
+                            List<PowerUp> loadedPowerUps = game.powerUps(id());
+                            List<Position> loadedShotTiles = game.shotTiles(id());
+                            List<Position> loadedRevealedTiles = game.shotTiles(enemy.id());
+                            sendEvent(new GameJoinedEvent(loadedShips, loadedPowerUps, loadedShotTiles, loadedRevealedTiles));
                         }
                         case DisconnectEvent ignored -> {
-                            if (this.gameID == null) break;
+                            if (this.gameID == null) {
+                                logger.warning("Player is not in game!");
+                                break;
+                            }
 
                             Game game = server.findGame(this.gameID);
 
-                            if (game == null) break;
+                            if (game == null) {
+                                logger.severe("Game not found!");
+                                break;
+                            }
 
-                            Player enemy = game.player(this.gameID);
+                            Player enemy = game.enemy(id());
                             game.removePlayer(this);
                             this.gameID = null;
 
-                            if (enemy == null) break;
-
-                            enemy.sendEvent(new PlayerLeftEvent());
+                            if (game.state() == Game.State.SETUP) game.uninitialize(this);
+                            if (enemy != null) enemy.sendEvent(new PlayerLeftEvent());
+                            if (server.disconnectPlayer(this)) System.out.println("Player " + id() + " disconnected!");
                         }
-                        case null, default -> System.err.println("Player >> Unknown command!");
+                        case InitializeGameEvent ev -> {
+                            if (this.gameID == null) {
+                                logger.warning("Player is not in game!");
+                                break;
+                            }
+
+                            Game game = server.findGame(this.gameID);
+
+                            if (game == null) logger.severe("Game not found!");
+                            else if (!game.initialize(this, ev.ships))
+                                logger.severe("Failed to initialize game: " + game.id());
+                        }
+                        case UpdateGameEvent ev -> {
+                            if (this.gameID == null) {
+                                logger.warning("Player is not in game!");
+                                break;
+                            }
+
+                            Game game = server.findGame(this.gameID);
+
+                            if (game == null) {
+                                logger.severe("Game not found!");
+                            } else if (!game.update(this, ev.usedPowerUps, ev.tilesShot))
+                                logger.severe("Game not updated!");
+                        }
+                        case null, default -> logger.warning("Unknown event!");
                     }
                 }
+            } catch (SocketException e) {
+                logger.warning(e.getLocalizedMessage());
             } catch (IOException e) {
-                System.err.println("Player >> " + e.getLocalizedMessage());
+                logger.severe(e.getLocalizedMessage());
             }
         });
         thread.start();
     }
 
     private void sendEvent(ServerEvent event) {
-
+        out.println(MyGson.instance.toJson(event));
     }
 
     public void disconnect() {
         if (!connected) return;
 
         try {
-            this.out.close();
-            this.in.close();
             this.instance.close();
             this.thread.interrupt();
             this.connected = false;
