@@ -8,10 +8,10 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 public class MyGson {
-    final public static Gson instance = new GsonBuilder()
+    final private static GsonBuilder baseBuilder = new GsonBuilder()
             .registerTypeAdapter(Position.class, new PositionDeserializer())
             .registerTypeAdapter(PowerUp.class, new PowerUpDeserializer())
             .registerTypeAdapter(Event.class, new EventDeserializer())
-            .registerTypeAdapter(Ship.class, new ShipDeserializer())
-            .create();
+            .registerTypeAdapter(Ship.class, new ShipDeserializer());
+    final public static Gson instance = baseBuilder.create();
 }
