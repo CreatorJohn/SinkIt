@@ -1,5 +1,6 @@
 package com.creatorjohn.helpers.json;
 
+import com.creatorjohn.db.models.DataModel;
 import com.creatorjohn.helpers.Position;
 import com.creatorjohn.helpers.Ship;
 import com.creatorjohn.helpers.events.Event;

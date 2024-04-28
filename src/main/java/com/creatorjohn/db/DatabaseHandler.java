@@ -1,15 +1,13 @@
 package com.creatorjohn.db;
 
 import com.creatorjohn.db.models.DataModel;
-import com.creatorjohn.db.models.UserModel;
 import com.creatorjohn.helpers.json.MyGson;
 import com.creatorjohn.helpers.logging.MyLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
-import java.lang.reflect.Field;
-import java.lang.reflect.Type;
+import java.lang.reflect.*;
 import java.util.*;
 
 final public class DatabaseHandler<T extends DataModel<T>> implements Database<T> {
@@ -17,12 +15,12 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
     final private Class<T> tClass;
     final private File file;
     final private boolean logFieldErrors;
-    private Set<String> uniqueKeys = new HashSet<>();
+    final private Set<String> uniqueKeys = new HashSet<>();
 
     public DatabaseHandler(@NotNull String filename, @NotNull Class<T> tClass, boolean logFieldErrors) {
         File file = new File(filename);
-        this.tClass = tClass;
         this.logFieldErrors = logFieldErrors;
+        this.tClass = tClass;
 
         try {
             if (file.exists() && !file.isFile()) logger.severe("Not file!");
@@ -36,43 +34,53 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
         this.file = file;
     }
 
-    @Nullable
-    private Field getField(String key) {
+    private @Nullable Method getMethod(String key) {
         try {
-            return tClass.getDeclaredField(key);
-        } catch (NoSuchFieldException ignored) {
+            return tClass.getMethod(key);
+        } catch (NoSuchMethodException ignored) {
             if (logFieldErrors) logger.severe("Failed to get field for \"" + key + "\"!");
             return null;
         }
     }
 
-    private <V> List<T> filter(V value, String key, List<T> items) {
-        Field field = getField(key);
+    private @Nullable Object getMethodValue(String key, T item) {
+        Method method = getMethod(key);
 
-        if (field == null) return List.of();
-
-        return items
-                .stream()
-                .filter(it -> checkItem(value, field, it))
-                .toList();
-    }
-
-    private <V> boolean checkItem(V value, String key, T item) {
-        Field field = getField(key);
-
-        if (field == null) return false;
+        if (method == null) return null;
 
         try {
-            return Objects.equals(value, field.get(item));
-        } catch (IllegalAccessException ignored) {
-            return false;
+            return method.invoke(item);
+        } catch (InvocationTargetException | IllegalAccessException ignored) {
+            return null;
         }
     }
 
-    private <V> boolean checkItem(V value, Field field, T item) {
+    private <V> List<T> filter(V value, String key, List<T> items) {
+        Method method = getMethod(key);
+
+        if (method == null) return List.of();
+
+        return items
+                .stream()
+                .filter(it -> checkItem(value, method, it))
+                .toList();
+    }
+
+    private <V> @Nullable T get(V value, String key, List<T> items) {
+        List<T> filtered = filter(value, key, items);
+
+        if (filtered.isEmpty()) return null;
+        else return filtered.getFirst();
+    }
+
+    private <V> boolean checkItem(V value, String key, T item) {
+        return value == null || Objects.equals(value, getMethodValue(key, item));
+    }
+
+    private <V> boolean checkItem(V value, @NotNull Method method, T item) {
         try {
-            return Objects.equals(value, field.get(item));
-        } catch (IllegalAccessException ignored) {
+            return value == null || Objects.equals(value, method.invoke(item));
+        } catch (InvocationTargetException | IllegalAccessException ignored) {
             return false;
         }
     }
@@ -80,30 +88,11 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
     private boolean checkUniqueKeys(List<T> all, List<T> selected) {
         return uniqueKeys
                 .stream()
-                .noneMatch(key -> selected
+                .allMatch(key -> selected
                         .stream()
-                        .anyMatch(item -> all
+                        .allMatch(item -> all.isEmpty() || all
                                 .stream()
-                                .anyMatch(it -> checkItem(getFieldValue(key, it), key, it))));
-    }
-
-    private Object getFieldValue(String key, T item) {
-        Field field = getField(key);
-
-        try {
-            if (field == null) return null;
-
-            return field.get(item);
-        } catch (IllegalAccessException e) {
-            return null;
-        }
-    }
-
-    private <V> T get(V value, String key, List<T> items) {
-        List<T> filtered = filter(value, key, items);
-
-        if (filtered.isEmpty()) return null;
-        else return filtered.getFirst();
+                                .noneMatch(it -> checkItem(getMethodValue(key, it), key, item))));
     }
 
     public void setUniqueKeys(List<String> keys) {
@@ -117,16 +106,22 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
 
     @Override
     public boolean save(List<T> items) {
-        List<T> saved = getAll();
-        boolean canBeAdded = checkUniqueKeys(saved, items) && checkUniqueKeys(items, items);
+        List<T> saved = new ArrayList<>(getAll());
+        boolean canBeAdded = checkUniqueKeys(saved, items);
 
         if (!canBeAdded) return false;
 
+        saved.addAll(items);
+
         try {
             FileWriter writer = new FileWriter(file, false);
-//            Records<T> records = new Records<>(items.stream().toList());
+            StringBuilder out = new StringBuilder();
 
-            writer.write(MyGson.instance.toJson(items));
+            saved.forEach(item -> out
+                    .append(MyGson.instance.toJson(item))
+                    .append("\n"));
+
+            writer.write(out.toString());
             writer.close();
             return true;
         } catch (IOException e) {
@@ -134,21 +129,23 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
         }
     }
 
-    @NotNull
     @Override
-    public List<T> getAll() {
+    public @NotNull List<T> getAll() {
         try {
+            ArrayList<T> out = new ArrayList<>();
             DataInputStream reader = new DataInputStream(new FileInputStream(file));
             String read = new String(reader.readAllBytes());
-            Class<List<T>> lClass = (Class<List<T>>)(Object)List.class;
-            List<T> data = MyGson.instance.fromJson(read, lClass);
 
-            if (data == null) data = List.of();
+            for (String part : read.split("\n")) {
+                if (part.isBlank()) continue;
 
-            System.out.println(data);
+                T parsed = MyGson.instance.fromJson(part, tClass);
+
+                out.add(parsed);
+            }
 
             reader.close();
-            return data;
+            return out;
         } catch (IOException e) {
             logger.severe(e.getLocalizedMessage());
             return List.of();
@@ -156,14 +153,14 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
     }
 
     @Override
-    public <V> List<T> getAll(V value, String key) {
+    public <V> @NotNull List<T> getAll(V value, String key) {
         List<T> records = getAll();
 
         return filter(value, key, records);
     }
 
     @Override
-    public <V> T get(V value, String key) {
+    public <V> @Nullable T get(V value, String key) {
         return get(value, key, getAll());
     }
 
@@ -193,25 +190,5 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
     @Override
     public boolean clear() {
         return save(List.of());
-    }
-
-//    private record Records<T>(List<T> data) {}
-
-    public static void main(String[] args) {
-        UserModel geff = new UserModel("Geff", "heslo1");
-        UserModel jimmy = new UserModel("Jimmy", "heslo2");
-        DatabaseHandler<UserModel> db = new DatabaseHandler<>("./src/main/java/com/creatorjohn/db/data/users.json", UserModel.class, false);
-        db.setUniqueKeys(List.of("username", "password"));
-
-        if (db.save(geff)) System.out.println("Geff saved!");
-        else System.out.println("Failed to save Geff!");
-
-        System.out.println(db.getAll());
-
-        if (db.save(jimmy)) System.out.println("Jimmy saved!");
-        else System.out.println("Failed to save Jimmy!");
-
-        System.out.println(db.getAll());
-        System.out.println("Only age 18+: " + db.getAll(18, "age"));
     }
 }
