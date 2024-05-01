@@ -1,11 +1,13 @@
 package com.creatorjohn.screens;
 
+import com.creatorjohn.handlers.Client;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 
-class Screen {
+abstract class Screen {
     final private JFrame frame;
     private Screen prevScreen;
     final protected JPanel instance = new JPanel(new BorderLayout(10, 10));
@@ -50,12 +52,13 @@ class Screen {
         this.prevScreen = prevScreen;
     }
 
-    public JPanel getInstance() {
+    public JPanel instance() {
         return instance;
     }
 
     Screen(JFrame mainFrame) {
         frame = mainFrame;
+        instance.setOpaque(false);
     }
 
     void navigateTo(Screen target) {

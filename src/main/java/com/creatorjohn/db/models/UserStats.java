@@ -1,6 +1,6 @@
 package com.creatorjohn.db.models;
 
-import com.creatorjohn.helpers.json.JConfig;
+import com.creatorjohn.helpers.JConfig;
 import com.creatorjohn.helpers.json.MyGson;
 import com.google.gson.*;
 

@@ -1,5 +1,6 @@
 package com.creatorjohn.helpers.json;
 
+import com.creatorjohn.helpers.JConfig;
 import com.creatorjohn.helpers.Position;
 import com.creatorjohn.helpers.Ship;
 import com.creatorjohn.helpers.events.*;
@@ -23,6 +24,32 @@ public class EventDeserializer implements JsonDeserializer<Event> {
         Event out;
 
         switch (type) {
+            case LOGIN -> {
+                if (JConfig.isNotPrimitive(obj.get("username"))) out = null;
+                else if (JConfig.isNotPrimitive(obj.get("password"))) out = null;
+                else out = new LoginEvent(obj.get("username").getAsString(), obj.get("password").getAsString());
+            }
+            case REGISTER -> {
+                if (JConfig.isNotPrimitive(obj.get("username"))) out = null;
+                else if (JConfig.isNotPrimitive(obj.get("password"))) out = null;
+                else out = new RegisterEvent(obj.get("username").getAsString(), obj.get("password").getAsString());
+            }
+            case LOGIN_RESPONSE -> {
+                String error;
+
+                if (JConfig.isNotPrimitive(obj.get("error"))) error = null;
+                else error = obj.get("error").getAsString();
+
+                return new LoginResponseEvent(error);
+            }
+            case REGISTER_RESPONSE -> {
+                String error;
+
+                if (JConfig.isNotPrimitive(obj.get("error"))) error = null;
+                else error = obj.get("error").getAsString();
+
+                return new RegisterResponseEvent(error);
+            }
             case CREATE_GAME -> out = new CreateGameEvent();
             case GAME_CREATED -> {
                 if (JConfig.isNotPrimitive(obj.get("gameID"))) out = null;
@@ -37,12 +64,14 @@ public class EventDeserializer implements JsonDeserializer<Event> {
                 else if (JConfig.isNotArray(obj.get("powerUps"))) out = null;
                 else if (JConfig.isNotArray(obj.get("shotTiles"))) out = null;
                 else if (JConfig.isNotArray(obj.get("revealedTiles"))) out = null;
+                else if (JConfig.isNotPrimitive(obj.get("success"))) out = null;
                 else {
                     List<Ship> ships = JConfig.convertArray("ships", obj, Ship.class);
                     List<PowerUp> powerUps = JConfig.convertArray("powerUps", obj, PowerUp.class);
                     List<Position> shotTiles = JConfig.convertArray("shotTiles", obj, Position.class);
                     List<Position> revealedTiles = JConfig.convertArray("revealedTiles", obj, Position.class);
-                    out = new GameJoinedEvent(ships, powerUps, shotTiles, revealedTiles);
+                    boolean success = Boolean.parseBoolean(obj.get("success").getAsString());
+                    out = new GameJoinedEvent(ships, powerUps, shotTiles, revealedTiles, success);
                 }
             }
             case PLAYER_JOINED -> out = new PlayerJoinedEvent();
@@ -50,6 +79,10 @@ public class EventDeserializer implements JsonDeserializer<Event> {
             case INITIALIZE_GAME -> {
                 if (JConfig.isNotArray(obj.get("ships"))) out = null;
                 else out = new InitializeGameEvent(JConfig.convertArray("ships", obj, Ship.class));
+            }
+            case GAME_INITIALIZED -> {
+                if (JConfig.isNotPrimitive(obj.get("success"))) out = null;
+                else out = new GameInitializedEvent(Boolean.parseBoolean(obj.get("success").getAsString()));
             }
             case UPDATE_GAME -> {
                 if (JConfig.isNotArray(obj.get("tilesShot")) || JConfig.isNotArray(obj.get("usedPowerUps"))) out = null;
@@ -62,10 +95,14 @@ public class EventDeserializer implements JsonDeserializer<Event> {
             case GAME_UPDATED -> {
                 if (JConfig.isNotPrimitive(obj.get("currentPlayer"))) out = null;
                 else if (JConfig.isNotArray(obj.get("shotTiles"))) out = null;
+                else if (JConfig.isNotArray(obj.get("powerUps"))) out = null;
+                else if (JConfig.isNotPrimitive(obj.get("success"))) out = null;
                 else {
                     String currentPlayer = obj.get("currentPlayer").getAsString();
                     List<Position> shotTiles = JConfig.convertArray("shotTiles", obj, Position.class);
-                    out = new GameUpdatedEvent(currentPlayer, shotTiles);
+                    List<PowerUp> powerUps = JConfig.convertArray("powerUps", obj, PowerUp.class);
+                    boolean success = Boolean.parseBoolean(obj.get("success").getAsString());
+                    out = new GameUpdatedEvent(currentPlayer, powerUps, shotTiles, success);
                 }
             }
             case GAME_FINISHED -> {

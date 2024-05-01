@@ -1,5 +1,6 @@
 package com.creatorjohn.helpers.json;
 
+import com.creatorjohn.helpers.JConfig;
 import com.creatorjohn.helpers.Position;
 import com.google.gson.*;
 

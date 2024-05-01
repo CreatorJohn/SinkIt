@@ -1,33 +1,31 @@
 package com.creatorjohn;
 
 import com.creatorjohn.handlers.Client;
-import com.creatorjohn.handlers.Server;
 import com.creatorjohn.helpers.events.*;
-import com.creatorjohn.helpers.server.Player;
 import com.creatorjohn.screens.*;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.Scanner;
 
 class Application {
 
     Application() {
         JFrame frame = new JFrame("SinkIt!");
-        frame.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 10));
-        frame.setResizable(false);
-        frame.setSize(600, 480);
+        frame.setLayout(new GridBagLayout());
+        frame.setExtendedState(frame.getExtendedState() | JFrame.MAXIMIZED_BOTH);
+        GridBagConstraints c = new GridBagConstraints();
+        c.anchor = GridBagConstraints.CENTER;
+        //frame.setResizable(false);
+        frame.setPreferredSize(new Dimension(1080, 720));
+        frame.setMinimumSize(frame.getPreferredSize());
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
+        frame.getContentPane().setBackground(new Color(0x000f24));
 
         MenuScreen main = new MenuScreen(frame);
 
-        frame.add(main.getInstance());
-        frame.setBackground(Color.GRAY);
+        frame.add(main.instance(), c);
     }
 
     static public void main(String[] args) {

@@ -66,6 +66,18 @@ public class Client {
         thread.start();
     }
 
+    public <T extends Event> T receiveEvent(Class<T> tClass) {
+        try {
+            String incoming = in.readLine();
+
+            if (incoming == null) return null;
+
+            return MyGson.instance.fromJson(incoming, tClass);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
     public boolean disconnect() {
         try {
             this.thread.interrupt();

@@ -11,17 +11,20 @@ final public class GameJoinedEvent extends Event implements ServerEvent {
     final public List<PowerUp> powerUps;
     final public List<Position> shotTiles;
     final public List<Position> revealedTiles;
+    final public boolean success;
 
     public GameJoinedEvent(
             List<Ship> ships,
             List<PowerUp> powerUps,
             List<Position> shotTiles,
-            List<Position> revealedTiles
+            List<Position> revealedTiles,
+            boolean success
     ) {
         super(Type.GAME_JOINED);
         this.ships = ships;
         this.powerUps = powerUps;
         this.shotTiles = shotTiles;
         this.revealedTiles = revealedTiles;
+        this.success = success;
     }
 }

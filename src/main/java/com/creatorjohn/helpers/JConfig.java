@@ -1,7 +1,9 @@
-package com.creatorjohn.helpers.json;
+package com.creatorjohn.helpers;
 
+import com.creatorjohn.helpers.json.MyGson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
@@ -27,5 +29,12 @@ public class JConfig {
                 .map(it -> MyGson.instance.fromJson(it.toString(), iClass))
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    public static <In, Out> Out convert(In value, Class<Out> ref) {
+        if (value.getClass().equals(ref)) return (Out) value;
+        else return null;
     }
 }

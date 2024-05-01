@@ -18,9 +18,9 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
     final private Set<String> uniqueKeys = new HashSet<>();
 
     public DatabaseHandler(@NotNull String filename, @NotNull Class<T> tClass, boolean logFieldErrors) {
-        File file = new File(filename);
         this.logFieldErrors = logFieldErrors;
         this.tClass = tClass;
+        File file = new File("src/main/java/com/creatorjohn/db/data/" + filename);
 
         try {
             if (file.exists() && !file.isFile()) logger.severe("Not file!");

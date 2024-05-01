@@ -68,7 +68,7 @@ public class Game {
         return shotTiles.getOrDefault(playerID, List.of());
     }
 
-    public boolean initialize(@NotNull Player player, List<Ship> ships) {
+    synchronized public boolean initialize(@NotNull Player player, List<Ship> ships) {
         if (initialized.contains(player.id())) return false;
         else if (initialized.size() > 1) return false;
 
@@ -80,7 +80,7 @@ public class Game {
         return true;
     }
 
-    public boolean uninitialize(Player player) {
+    synchronized public boolean uninitialize(Player player) {
         if (state != State.SETUP) return false;
         else if (!initialized.contains(player.id())) return false;
 
@@ -90,18 +90,22 @@ public class Game {
         return true;
     }
 
-    public boolean update(Player player, List<PowerUp> powerUps, List<Position> shotTiles) {
+    synchronized public boolean update(Player player, List<PowerUp> powerUps, List<Position> shotTiles) {
         if (state != State.RUNNING) return false;
         else if (!this.powerUps.containsKey(player.id())) return false;
         else if (!this.shotTiles.containsKey(player.id())) return false;
 
+        Player enemy = enemy(player.id());
+
+        if (enemy == null) return false;
+
         this.powerUps.put(player.id(), powerUps);
-        this.shotTiles.put(player.id(), shotTiles);
+        this.shotTiles.put(enemy.id(), shotTiles);
 
         return true;
     }
 
-    public boolean addPlayer(@NotNull Player player) {
+    synchronized public boolean addPlayer(@NotNull Player player) {
         if (players.size() > 1) return false;
         else if (players.containsKey(player.id())) return false;
 
@@ -110,7 +114,7 @@ public class Game {
         return true;
     }
 
-    public void removePlayer(@NotNull Player player) {
+    synchronized public void removePlayer(@NotNull Player player) {
         players.remove(player.id());
 
         if (players.isEmpty()) server.deleteGame(this);
