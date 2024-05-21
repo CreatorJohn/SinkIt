@@ -1,13 +1,13 @@
-package com.creatorjohn.helpers;
+package com.creatorjohn.helpers.entities;
 
+import com.creatorjohn.helpers.GameBoard;
+import com.creatorjohn.helpers.Position;
 import com.creatorjohn.helpers.json.MyGson;
-import com.google.gson.Gson;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
-public class Ship {
+public final class Ship implements GameComponent {
     final int size;
     final ArrayList<Position> positions = new ArrayList<>();
 

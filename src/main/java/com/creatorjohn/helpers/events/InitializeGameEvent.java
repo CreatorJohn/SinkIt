@@ -1,6 +1,6 @@
 package com.creatorjohn.helpers.events;
 
-import com.creatorjohn.helpers.Ship;
+import com.creatorjohn.helpers.entities.Ship;
 
 import java.util.List;
 

@@ -1,9 +1,9 @@
-package com.creatorjohn.helpers.powerups;
+package com.creatorjohn.helpers.entities;
 
 import com.creatorjohn.helpers.GameBoard;
+import com.creatorjohn.helpers.JConfig;
 import com.creatorjohn.helpers.Position;
-import com.creatorjohn.helpers.json.MyGson;
-import com.google.gson.Gson;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -25,13 +25,13 @@ final public class Radar extends PowerUp {
     }
 
     @Override
-    public int getCost(GameBoard.BoardSize boardSize) {
+    public int getCost(GameBoard.@NotNull BoardSize boardSize, int maxShipSize) {
         int price = -1;
 
         switch (boardSize) {
-            case SMALL -> price = 8 * 5 * 2;
-            case MEDIUM -> price = 11 * 5 * 2;
-            case BIG -> price = 14 * 5 * 2;
+            case SMALL -> price = JConfig.smallMapShipCount * maxShipSize * 2;
+            case MEDIUM -> price = JConfig.mediumMapShipCount * maxShipSize * 2;
+            case BIG -> price = JConfig.bigMapShipCount * maxShipSize * 2;
         }
 
         return price;

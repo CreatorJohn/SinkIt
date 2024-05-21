@@ -3,6 +3,8 @@ package com.creatorjohn.handlers;
 import com.creatorjohn.db.Database;
 import com.creatorjohn.db.DatabaseHandler;
 import com.creatorjohn.db.models.UserModel;
+import com.creatorjohn.db.models.UserStats;
+import com.creatorjohn.helpers.JConfig;
 import com.creatorjohn.helpers.events.LoginResponseEvent;
 import com.creatorjohn.helpers.events.RegisterResponseEvent;
 import com.creatorjohn.helpers.logging.MyLogger;
@@ -111,17 +113,35 @@ public class Server {
     }
 
     synchronized public boolean joinPlayer(@NotNull Player player) {
-        if (players.containsKey(player.id())) return false;
+        if (players.containsKey(player.ip())) return false;
 
-        players.put(player.id(), player);
+        players.put(player.ip(), player);
 
         return true;
     }
 
-    synchronized public boolean disconnectPlayer(@NotNull Player player) {
-        if (!players.containsKey(player.id())) return false;
+    synchronized public boolean updatePlayerStats(@NotNull String id, UserStats stats) {
+        UserModel saved = usersDB.get(id, "id");
 
-        players.remove(player.id());
+        if (saved == null) return false;
+
+        UserModel updated = new UserModel(id, saved.username(), saved.password(), stats);
+
+        return usersDB.update(id, "id", updated);
+    }
+
+    synchronized public UserStats getPlayerStats(@NotNull String id) {
+        UserModel user = usersDB.get(id, "id");
+
+        if (user == null) return null;
+
+        return user.stats();
+    }
+
+    synchronized public boolean disconnectPlayer(@NotNull Player player) {
+        if (!players.containsKey(player.ip())) return false;
+
+        players.remove(player.ip());
         player.disconnect();
 
         return true;
@@ -160,6 +180,6 @@ public class Server {
     public static void main(String[] args) {
         Server server = new Server();
 
-        if (server.open(5000)) System.out.println("Server is opened!");
+        if (server.open(JConfig.serverPort)) System.out.println("Server is opened!");
     }
 }

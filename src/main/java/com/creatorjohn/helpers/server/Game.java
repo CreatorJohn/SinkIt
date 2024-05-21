@@ -2,9 +2,8 @@ package com.creatorjohn.helpers.server;
 
 import com.creatorjohn.handlers.Server;
 import com.creatorjohn.helpers.Position;
-import com.creatorjohn.helpers.Ship;
-import com.creatorjohn.helpers.json.MyGson;
-import com.creatorjohn.helpers.powerups.PowerUp;
+import com.creatorjohn.helpers.entities.Ship;
+import com.creatorjohn.helpers.entities.PowerUp;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,6 +18,7 @@ public class Game {
     final private ArrayList<String> initialized = new ArrayList<>(2);
     final private Server server;
     private State state = State.SETUP;
+    private Player curentPlayer;
 
     public static Game create(@NotNull Player host, @NotNull Server parent) {
         Game game = new Game(parent);
@@ -32,12 +32,22 @@ public class Game {
         this.server = parent;
     }
 
-    @Nullable
+    public String id() {
+        return id;
+    }
+
+    public State state() {
+        return state;
+    }
+
     public Player player(String id) {
         return id == null ? null : players.get(id);
     }
 
-    @Nullable
+    synchronized public Player currentPlayer() {
+        return curentPlayer;
+    }
+
     public Player enemy(String playerID) {
         if (playerID == null) return null;
         else if (!players.containsKey(playerID)) return null;
@@ -68,6 +78,14 @@ public class Game {
         return shotTiles.getOrDefault(playerID, List.of());
     }
 
+    synchronized public void updateCurrentPlayer() {
+        Player enemy = enemy(curentPlayer.id());
+
+        if (enemy == null) return;
+
+        curentPlayer = enemy;
+    }
+
     synchronized public boolean initialize(@NotNull Player player, List<Ship> ships) {
         if (initialized.contains(player.id())) return false;
         else if (initialized.size() > 1) return false;
@@ -75,7 +93,16 @@ public class Game {
         initialized.add(player.id());
         this.ships.put(player.id(), ships);
 
-        if (initialized.size() == 2) state = State.RUNNING;
+        if (initialized.size() == 2) {
+            state = State.RUNNING;
+
+            int index = players.isEmpty() ? -1 : new Random().nextInt(players.size());
+
+            if (index == -1) return false;
+
+            String key = players.keySet().stream().toList().get(index);
+            curentPlayer = players.get(key);
+        }
 
         return true;
     }
@@ -92,15 +119,16 @@ public class Game {
 
     synchronized public boolean update(Player player, List<PowerUp> powerUps, List<Position> shotTiles) {
         if (state != State.RUNNING) return false;
-        else if (!this.powerUps.containsKey(player.id())) return false;
-        else if (!this.shotTiles.containsKey(player.id())) return false;
+        if (!this.powerUps.containsKey(player.id())) return false;
+        if (!this.shotTiles.containsKey(player.id())) return false;
 
-        Player enemy = enemy(player.id());
+        List<PowerUp> pSaved = new ArrayList<>(this.powerUps.get(player.id()));
+        pSaved.addAll(powerUps);
+        this.powerUps.put(player.id(), pSaved);
 
-        if (enemy == null) return false;
-
-        this.powerUps.put(player.id(), powerUps);
-        this.shotTiles.put(enemy.id(), shotTiles);
+        List<Position> tsSaved = new ArrayList<>(this.shotTiles.get(player.id()));
+        tsSaved.addAll(shotTiles);
+        this.shotTiles.put(player.id(), tsSaved);
 
         return true;
     }
@@ -110,6 +138,8 @@ public class Game {
         else if (players.containsKey(player.id())) return false;
 
         players.put(player.id(), player);
+        if (!powerUps.containsKey(player.id())) powerUps.put(player.id(), List.of());
+        if (!shotTiles.containsKey(player.id())) shotTiles.put(player.id(), List.of());
 
         return true;
     }
@@ -118,14 +148,6 @@ public class Game {
         players.remove(player.id());
 
         if (players.isEmpty()) server.deleteGame(this);
-    }
-
-    public String id() {
-        return id;
-    }
-
-    public State state() {
-        return state;
     }
 
     public enum State { SETUP, RUNNING, FINISHED }

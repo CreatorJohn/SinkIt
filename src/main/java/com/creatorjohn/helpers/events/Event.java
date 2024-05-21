@@ -2,7 +2,7 @@ package com.creatorjohn.helpers.events;
 
 import com.creatorjohn.helpers.json.MyGson;
 
-public sealed class Event permits CreateGameEvent, DisconnectEvent, GameCreatedEvent, GameFinishedEvent, GameInitializedEvent, GameJoinedEvent, GameUpdatedEvent, InitializeGameEvent, JoinGameEvent, LoginEvent, LoginResponseEvent, PlayerJoinedEvent, PlayerLeftEvent, RegisterEvent, RegisterResponseEvent, UpdateGameEvent {
+public sealed class Event permits CreateGameEvent, DisconnectEvent, GameCreatedEvent, GameFinishedEvent, GameInitializedEvent, GameJoinedEvent, GameUpdatedEvent, InitializeGameEvent, JoinGameEvent, LoginEvent, LoginResponseEvent, LogoutEvent, PlayerJoinedEvent, PlayerLeftEvent, RegisterEvent, RegisterResponseEvent, StatisticsRequestEvent, StatisticsResponseEvent, UpdateGameEvent {
     final private Type type;
 
     public Event(Type type) {
@@ -26,6 +26,9 @@ public sealed class Event permits CreateGameEvent, DisconnectEvent, GameCreatedE
         UPDATE_GAME,
         GAME_FINISHED,
         DISCONNECT,
+        LOGOUT,
+        STATISTICS_REQUEST,
+        STATISTICS_RESPONSE
     }
 
     @Override

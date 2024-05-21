@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.lang.reflect.*;
+import java.net.URL;
 import java.util.*;
 
 final public class DatabaseHandler<T extends DataModel<T>> implements Database<T> {
@@ -20,7 +21,7 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
     public DatabaseHandler(@NotNull String filename, @NotNull Class<T> tClass, boolean logFieldErrors) {
         this.logFieldErrors = logFieldErrors;
         this.tClass = tClass;
-        File file = new File("src/main/java/com/creatorjohn/db/data/" + filename);
+        File file = new File("db/data/" + filename);
 
         try {
             if (file.exists() && !file.isFile()) logger.severe("Not file!");
@@ -125,6 +126,7 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
             writer.close();
             return true;
         } catch (IOException e) {
+            System.err.println(e);
             return false;
         }
     }
@@ -175,7 +177,8 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
 
         records.set(index, newItem);
 
-        return true;
+        clear();
+        return save(records);
     }
 
     @Override
@@ -189,6 +192,15 @@ final public class DatabaseHandler<T extends DataModel<T>> implements Database<T
 
     @Override
     public boolean clear() {
-        return save(List.of());
+        try {
+            FileWriter writer = new FileWriter(file, false);
+
+            writer.write("");
+
+            writer.close();
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 }

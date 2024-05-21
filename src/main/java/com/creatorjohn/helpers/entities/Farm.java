@@ -1,11 +1,10 @@
-package com.creatorjohn.helpers.powerups;
+package com.creatorjohn.helpers.entities;
 
 import com.creatorjohn.helpers.GameBoard;
+import com.creatorjohn.helpers.JConfig;
 import com.creatorjohn.helpers.Position;
-import com.creatorjohn.helpers.json.MyGson;
-import com.google.gson.Gson;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -57,13 +56,13 @@ final public class Farm extends PowerUp {
     }
 
     @Override
-    public int getCost(GameBoard.BoardSize boardSize) {
+    public int getCost(GameBoard.@NotNull BoardSize boardSize, int maxShipSize) {
         double price = -1;
 
         switch (boardSize) {
-            case SMALL -> price = 8 * 5 * 3.5;
-            case MEDIUM -> price = 11 * 5 * 3.5;
-            case BIG -> price = 14 * 5 * 3.5;
+            case SMALL -> price = JConfig.smallMapShipCount * maxShipSize * 3.5;
+            case MEDIUM -> price = JConfig.mediumMapShipCount * maxShipSize * 3.5;
+            case BIG -> price = JConfig.bigMapShipCount * maxShipSize * 3.5;
         }
 
         return (int) price;

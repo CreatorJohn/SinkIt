@@ -9,24 +9,33 @@ import java.io.InputStream;
 import java.util.InputMismatchException;
 
 public class JLogo extends JPanel {
+    private final BufferedImage reference;
     private BufferedImage image;
-    private BufferedImage reference;
 
     public JLogo(String assetName, int width, int height) {
         this.setOpaque(false);
+        reference = loadImage(assetName);
+        image = resizeImage(reference, width, height);
+
+        this.setPreferredSize(new Dimension(width, height));
+    }
+
+    public static BufferedImage loadImage(String assetName) {
+        BufferedImage out = null;
+
         try {
-            InputStream input = getClass().getResourceAsStream("/assets/" + assetName);
+            InputStream input = JLogo.class.getResourceAsStream("/assets/" + assetName);
 
             if (input == null) throw new InputMismatchException("Invalid asset name!");
 
-            reference = ImageIO.read(input);
-            image = resizeImage(reference, width, height);
-            this.setPreferredSize(new Dimension(width, height));
+            out = ImageIO.read(input);
 
             input.close();
         } catch (IOException e) {
             System.err.println("JLogo >> Failed to load logo!");
         }
+
+        return out;
     }
 
     public void updateSize(int width, int height) {
@@ -36,7 +45,7 @@ public class JLogo extends JPanel {
         this.repaint();
     }
 
-    private BufferedImage resizeImage(BufferedImage original, int width, int height) {
+    public static BufferedImage resizeImage(BufferedImage original, int width, int height) {
         BufferedImage resized = new BufferedImage(width, height, original.getType());
         Graphics2D g = resized.createGraphics();
         g.drawImage(original, 0, 0, width, height, null);

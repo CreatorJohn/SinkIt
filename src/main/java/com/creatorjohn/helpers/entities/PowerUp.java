@@ -1,18 +1,17 @@
-package com.creatorjohn.helpers.powerups;
+package com.creatorjohn.helpers.entities;
 
 import com.creatorjohn.helpers.GameBoard;
 import com.creatorjohn.helpers.Position;
 import com.creatorjohn.helpers.json.MyGson;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonSyntaxException;
+import org.jetbrains.annotations.NotNull;
 
+import java.awt.image.BufferedImage;
 import java.util.List;
 
-public sealed class PowerUp permits Bomb, Bomber, Radar, Farm {
-    final private Type type;
+public sealed class PowerUp implements GameComponent permits Bomb, Bomber, Radar, Farm {
+    final public Type type;
 
-    public PowerUp(Type type) {
+    public PowerUp(@NotNull Type type) {
         this.type = type;
     }
 
@@ -21,7 +20,7 @@ public sealed class PowerUp permits Bomb, Bomber, Radar, Farm {
      * @param boardSize Type of game board
      * @return power-up cost
      */
-    public int getCost(GameBoard.BoardSize boardSize) {
+    public int getCost(@NotNull GameBoard.BoardSize boardSize, int maxShipSize) {
         return -1;
     };
 

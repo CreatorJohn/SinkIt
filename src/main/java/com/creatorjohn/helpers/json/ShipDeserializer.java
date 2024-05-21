@@ -2,7 +2,7 @@ package com.creatorjohn.helpers.json;
 
 import com.creatorjohn.helpers.JConfig;
 import com.creatorjohn.helpers.Position;
-import com.creatorjohn.helpers.Ship;
+import com.creatorjohn.helpers.entities.Ship;
 import com.google.gson.*;
 
 import java.lang.reflect.Type;

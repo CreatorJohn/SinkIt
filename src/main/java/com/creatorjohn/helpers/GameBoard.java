@@ -1,26 +1,36 @@
 package com.creatorjohn.helpers;
 
+import com.creatorjohn.db.models.UserModel;
 import com.creatorjohn.helpers.events.UpdateGameEvent;
-import com.creatorjohn.helpers.powerups.*;
+import com.creatorjohn.helpers.entities.*;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 public class GameBoard {
     final private ArrayList<Position> shipsPos = new ArrayList<>();
     final private ArrayList<Position> powerUpsPos = new ArrayList<>();
-    final ArrayList<PowerUp> powerUps = new ArrayList<>();
-    final ArrayList<Ship> ships = new ArrayList<>();
     final private List<DetailedPosition> allPositions;
     final private BoardSize boardSize;
     final private BoardType boardType;
+    final private int maxShipSize;
+    final ArrayList<PowerUp> powerUps = new ArrayList<>();
+    final ArrayList<Ship> ships = new ArrayList<>();
+    private Consumer<Integer> onTokensChanged;
+    private Consumer<Position> onShoot;
+    private Runnable onGameOver;
+    private boolean gameOver = false;
     private int shootCounter = 0;
+    private int shipCounter = 0;
     private int tokens = 0;
     final int size;
 
-    public GameBoard(BoardSize boardSize, BoardType boardType) {
+    public GameBoard(BoardSize boardSize, BoardType boardType, int maxShipSize) {
         this.boardSize = boardSize;
         this.boardType = boardType;
+        this.maxShipSize = maxShipSize;
 
         switch (boardSize) {
             case SMALL -> this.size = 10;
@@ -41,51 +51,82 @@ public class GameBoard {
         this.allPositions = positions;
     }
 
+    public void onShoot(Consumer<Position> onShoot) {
+        this.onShoot = onShoot;
+    }
+
+    public void onGameOver(Runnable onGameOver) {
+        this.onGameOver = onGameOver;
+    }
+
+    public static int shipCount(@NotNull BoardSize size) {
+        return switch (size) {
+            case SMALL -> JConfig.smallMapShipCount;
+            case MEDIUM -> JConfig.mediumMapShipCount;
+            case BIG -> JConfig.bigMapShipCount;
+        };
+    }
+
     public boolean updateGameBoard(UpdateGameEvent event) {
-        boolean powerUpsUsed = event.usedPowerUps.stream().allMatch(powerUp -> {
-            switch (powerUp) {
-                case Bomb bomb -> { return useBombPowerUp(bomb); }
-                case Bomber bomber -> { return useBomberPowerUp(bomber); }
-                case Farm farm -> { return useFarmPowerUp(farm); }
-                case Radar radar -> { return useRadarPowerUp(radar); }
-                default -> { return false; }
-            }
+        boolean powerUpsUsed = event.usedPowerUps.stream().allMatch(powerUp -> switch (powerUp) {
+            case Bomb bomb -> useBombPowerUp(bomb);
+            case Bomber bomber -> useBomberPowerUp(bomber);
+            case Farm farm -> useFarmPowerUp(farm);
+            case Radar radar -> useRadarPowerUp(radar);
+            default -> false;
         });
         boolean tilesShot = event.tilesShot.stream().allMatch(tile -> {
             shootCounter++;
             return canShootTile(tile.x(), tile.y());
         });
 
+        if (tilesShot) event.tilesShot.forEach(it -> shootTile(it.x(), it.y()));
+
         return powerUpsUsed && tilesShot;
     }
 
     public boolean placeShip(Ship ship) {
-        if (boardType == BoardType.ENEMY) return false;
-        if (shipsPos.stream().anyMatch(pos -> ship.getGameBoardPositions().contains(pos)))
+        return placeShip(ship, false);
+    }
+
+    public boolean placeShip(Ship ship, boolean force) {
+        if (shipCount(boardSize) <= shipCounter && !force) return false;
+        if (shipsPos.stream().anyMatch(pos -> ship.getGameBoardPositions().contains(pos)) && !force)
             return false;
 
         ships.add(ship);
         shipsPos.addAll(ship.getGameBoardPositions());
-        allPositions.removeAll(ship.getGameBoardDetailedPositions());
+        shipCounter++;
 
         return true;
     }
 
-    public boolean removeShip(int x, int y) {
-        if (boardType == BoardType.ENEMY) return false;
+    public Ship ship(Position position) {
+        List<Ship> filtered = ships.stream().filter(it -> it.getGameBoardPositions().contains(position)).toList();
+
+        if (filtered.isEmpty()) return null;
+        else return filtered.getFirst();
+    }
+
+    public Ship removeShip(@NotNull Position position) {
+        return  removeShip(position, false);
+    }
+
+    public Ship removeShip(@NotNull Position position, boolean force) {
+        if (boardType == BoardType.ENEMY && !force) return null;
 
         Optional<Ship> target = ships
                 .stream()
-                .filter(ship -> ship.getGameBoardPositions().contains(new Position(x, y)))
+                .filter(ship -> ship.getGameBoardPositions().contains(position))
                 .findFirst();
 
-        if (target.isEmpty()) return false;
+        if (target.isEmpty()) return null;
 
         ships.remove(target.get());
         shipsPos.removeAll(target.get().getGameBoardPositions());
-        allPositions.removeAll(target.get().getGameBoardDetailedPositions());
+        shipCounter--;
 
-        return true;
+        return target.get();
     }
 
     public boolean canShootTile(int x, int y) {
@@ -95,55 +136,57 @@ public class GameBoard {
     }
 
     public boolean shootTile(int x, int y) {
-        if (!canShootTile(x, y)) return false;
+        return shootTile(x, y, false);
+    }
 
-        Optional<Ship> targetShip = ships
-                .stream()
-                .filter(ship -> ship.getGameBoardPositions().contains(new Position(x, y)))
-                .findFirst();
+    public boolean shootTile(int x, int y, boolean force) {
+        if (!canShootTile(x, y) && !force) return false;
+
         Optional<PowerUp> targetPowerUp = powerUps
                 .stream()
-                .filter(powerUp -> powerUp.getPositions().contains(new Position(x, y)))
+                .filter(powerUp -> powerUp.getPositions().stream().anyMatch(it -> it.x() == x && it.y() == y))
+                .findFirst();
+        Optional<Ship> targetShip = ships
+                .stream()
+                .filter(ship -> ship.getGameBoardPositions().stream().anyMatch(it -> it.x() == x && it.y() == y))
                 .findFirst();
 
-        int index = allPositions.indexOf(new DetailedPosition(new Position(x, y), false));
+        Optional<DetailedPosition> position = allPositions.stream().filter(it -> it.position.x() == x && it.position.y() == y).findFirst();
+
+        if (position.isEmpty()) return false;
+
+        int index = allPositions.indexOf(position.get());
 
         allPositions.set(index, new DetailedPosition(allPositions.get(index).position(), true));
-        targetPowerUp.ifPresent(powerUp -> powerUpsPos.removeAll(powerUp.getPositions()));
 
-        if (targetShip.isPresent()) {
-            List<Position> shipPos = targetShip.get().getGameBoardPositions();
-            boolean isDestroyed = shipPos
-                    .stream()
-                    .allMatch(pos -> {
-                        Optional<DetailedPosition> found = allPositions
-                                .stream()
-                                .filter(it -> it.position().x() == pos.x() && it.position().y() == pos.y())
-                                .findFirst();
+        targetShip.ifPresent(ignored -> shipsPos.removeIf(it -> it.x() == x && it.y() == y));
+        targetPowerUp.ifPresent(ignored -> powerUpsPos.removeIf(it -> it.x() == x && it.y() == y));
 
-                        return found.isPresent() && found.get().revealed();
-                    });
-
-            if (isDestroyed) {
-                ships.remove(targetShip.get());
-                shipsPos.removeAll(shipPos);
-            }
-        } else if (targetPowerUp.isPresent() && targetPowerUp.get() instanceof Bomb bomb) {
+        if (targetPowerUp.isPresent() && targetPowerUp.get() instanceof Bomb bomb) {
             powerUps.remove(bomb);
 
-            for (int i = 0; i < 3; i++) {
+            if (!force) for (int i = 0; i < 3; i++) {
                 int maxIndex = (int) allPositions.stream().filter(it -> !it.revealed()).count();
+
+                if (maxIndex == 0) break;
+
                 int randomIndex = new Random().nextInt(maxIndex);
                 Position randomPos = allPositions.get(randomIndex).position();
                 shootTile(randomPos.x(), randomPos.y());
             }
         }
 
+        if (onShoot != null) onShoot.accept(new Position(x, y));
+        if (onGameOver != null && !gameOver && shipsPos.isEmpty()) {
+            onGameOver.run();
+            gameOver = true;
+        }
+
         return true;
     }
 
     public void generateTokens() {
-        if (boardType == BoardType.MY) return;
+        if (boardType != BoardType.MY) return;
 
         List<Position> revealed = allPositions
                 .stream()
@@ -173,109 +216,149 @@ public class GameBoard {
                 .reduce(Integer::sum);
 
         tokens += farmTokens.orElse(0) + shipsTokens.orElse(0);
+
+        if (onTokensChanged != null) onTokensChanged.accept(tokens);
     }
 
     public boolean canUsePowerUp(PowerUp powerUp) {
-        if (powerUp.getCost(boardSize) > tokens) return false;
+        if (powerUp.getCost(boardSize, maxShipSize) > tokens) return false;
 
-        boolean success = false;
+        boolean success;
         HashSet<Position> emptyHiddenPositions = new HashSet<>(allPositions
                 .stream()
                 .filter(it -> !it.revealed()
-                        && shipsPos.contains(it.toPosition())
-                        && powerUpsPos.contains(it.toPosition()))
+                        && !shipsPos.contains(it.toPosition())
+                        && !powerUpsPos.contains(it.toPosition()))
                 .map(DetailedPosition::toPosition)
                 .toList());
         List<Position> emptyRevealedPositions = allPositions
                 .stream()
                 .filter(it -> it.revealed()
-                        && shipsPos.contains(it.toPosition())
-                        && powerUpsPos.contains(it.toPosition()))
+                        && !shipsPos.contains(it.toPosition())
+                        && !powerUpsPos.contains(it.toPosition()))
                 .map(DetailedPosition::toPosition)
                 .toList();
 
         switch (powerUp) {
-            case Bomb bomb -> success = emptyHiddenPositions.contains(bomb.position());
-            case Farm farm -> success = emptyHiddenPositions.containsAll(farm.positions());
-            case Radar radar -> success = emptyRevealedPositions.contains(radar.position());
-            default -> success = true;
+            case Bomb bomb -> success = boardType == BoardType.MY && emptyHiddenPositions.contains(bomb.position());
+            case Farm farm -> success = boardType == BoardType.MY && emptyHiddenPositions.containsAll(farm.positions());
+            case Radar radar -> success = boardType == BoardType.ENEMY && emptyRevealedPositions.contains(radar.position());
+            case Bomber ignored -> success = boardType == BoardType.ENEMY;
+            default -> success = false;
         }
 
         return success;
     }
 
+    public boolean usePowerUp(PowerUp powerUp) {
+        return usePowerUp(powerUp, false);
+    }
+
+    public boolean usePowerUp(PowerUp powerUp, boolean force) {
+        return switch (powerUp) {
+            case Bomb bomb -> useBombPowerUp(bomb, force);
+            case Farm farm -> useFarmPowerUp(farm, force);
+            case Radar radar -> useRadarPowerUp(radar, force);
+            case Bomber bomber -> useBomberPowerUp(bomber, force);
+            case null, default -> false;
+        };
+    }
+
     public boolean useBombPowerUp(Bomb bomb) {
-        if (!canUsePowerUp(bomb)) return false;
+        return useBombPowerUp(bomb, false);
+    }
+
+    public boolean useBombPowerUp(Bomb bomb, boolean force) {
+        if (!canUsePowerUp(bomb) && !force) return false;
 
         powerUps.add(bomb);
         powerUpsPos.add(bomb.position());
-        tokens -= bomb.getCost(boardSize);
+        if (!force) tokens -= bomb.getCost(boardSize, maxShipSize);
+        if (onTokensChanged != null) onTokensChanged.accept(tokens);
 
         return true;
     }
 
     public boolean useFarmPowerUp(Farm farm) {
-        if (!canUsePowerUp(farm)) return false;
+        return useFarmPowerUp(farm, false);
+    }
+
+    public boolean useFarmPowerUp(Farm farm, boolean force) {
+        if (!canUsePowerUp(farm) && !force) return false;
 
         powerUps.add(farm);
-        tokens -= farm.getCost(boardSize);
         powerUpsPos.addAll(farm.positions());
+        if (!force) tokens -= farm.getCost(boardSize, maxShipSize);
+        if (onTokensChanged != null) onTokensChanged.accept(tokens);
 
         return true;
     }
 
     public boolean useRadarPowerUp(Radar radar) {
-        if (!canUsePowerUp(radar)) return false;
+        return useRadarPowerUp(radar, false);
+    }
+
+    public boolean useRadarPowerUp(Radar radar, boolean force) {
+        if (!canUsePowerUp(radar) && !force) return false;
 
         for (int i = -1; i < 2; i++) {
             for (int j = -1; j < 2; j++) {
                 if (i == 0 && j == 0) continue;
 
-                shootTile(j, i);
+                shootTile(radar.position().x() + j, radar.position().y() + i, force);
             }
         }
 
         powerUps.add(radar);
         powerUpsPos.add(radar.position());
-        tokens -= radar.getCost(boardSize);
+        if (!force) tokens -= radar.getCost(boardSize, maxShipSize);
+        if (onTokensChanged != null) onTokensChanged.accept(tokens);
 
         return true;
     }
 
     public boolean useBomberPowerUp(Bomber bomber) {
-        if (!canUsePowerUp(bomber)) return false;
+        return useBomberPowerUp(bomber, false);
+    }
+
+    public boolean useBomberPowerUp(Bomber bomber, boolean force) {
+        if (!canUsePowerUp(bomber) && !force) return false;
 
         boolean isHorizontal = bomber.direction() == Bomber.Direction.HORIZONTAL;
         boolean isVertical = bomber.direction() == Bomber.Direction.VERTICAL;
 
-        ArrayList<Position> out = new ArrayList<>();
-        ArrayList<Position> revealedShipTiles = shipsPos
+        List<Position> positions = allPositions
                 .stream()
-                .filter(shipPos ->
-                        (isHorizontal && shipPos.x() == bomber.position()) ||
-                                (isVertical && shipPos.y() == bomber.position()))
-                .collect(Collectors.toCollection(ArrayList::new));
-        ArrayList<Position> revealedPowerUpTiles = powerUpsPos
-                .stream()
-                .filter(powerUpPos ->
-                        (isHorizontal && powerUpPos.x() == bomber.position()) ||
-                                (isVertical && powerUpPos.y() == bomber.position()))
-                .collect(Collectors.toCollection(ArrayList::new));
-        out.addAll(revealedShipTiles);
-        out.addAll(revealedPowerUpTiles);
-
-        List<Integer> indexes = out
-                .stream()
-                .map(it -> allPositions.contains(new DetailedPosition(it, false))
-                        ? allPositions.indexOf(new DetailedPosition(it, false))
-                        : allPositions.indexOf(new DetailedPosition(it, true)))
+                .filter(it -> {
+                    if (isHorizontal && it.position.y() == bomber.position().y()) {
+                        return true;
+                    } else return isVertical && it.position.x() == bomber.position().x();
+                })
+                .map(DetailedPosition::toPosition)
                 .toList();
 
-        indexes.forEach(index -> {
-            allPositions.set(index, new DetailedPosition(allPositions.get(index).position(), true));
-        });
+        positions.forEach(pos -> shootTile(pos.x(), pos.y(), force));
+
+        if (!force) tokens -= bomber.getCost(boardSize, maxShipSize);
+        if (onTokensChanged != null) onTokensChanged.accept(tokens);
 
         return true;
+    }
+
+    public void setTokens(int value) {
+        this.tokens = value;
+    }
+
+    public void onTokensChanged(Consumer<Integer> function) {
+        this.onTokensChanged = function;
+    }
+
+    public List<Ship> ships() {
+        return ships;
+    }
+
+    public boolean isGameOver() {
+        return shipsPos.isEmpty();
     }
 
     public enum BoardSize { SMALL, MEDIUM, BIG }

@@ -1,6 +1,5 @@
 package com.creatorjohn.helpers;
 
-import com.creatorjohn.helpers.powerups.PowerUp;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

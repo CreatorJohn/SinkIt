@@ -1,16 +1,21 @@
 package com.creatorjohn.helpers.json;
 
+import com.creatorjohn.helpers.JConfig;
 import com.creatorjohn.helpers.Position;
-import com.creatorjohn.helpers.powerups.*;
+import com.creatorjohn.helpers.entities.*;
 import com.google.gson.*;
 
 import java.lang.reflect.Type;
+import java.sql.SQLOutput;
 import java.util.List;
+import java.util.Objects;
 
 public class PowerUpDeserializer implements JsonDeserializer<PowerUp> {
 
     @Override
     public PowerUp deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+        if (!json.isJsonObject()) return null;
+
         JsonObject obj = json.getAsJsonObject();
         PowerUp.Type type = PowerUp.Type.valueOf(obj.get("type").getAsString());
 
@@ -18,35 +23,43 @@ public class PowerUpDeserializer implements JsonDeserializer<PowerUp> {
 
         switch (type) {
             case BOMB -> {
-                JsonObject posObj = obj
-                        .getAsJsonArray("positions")
-                        .get(0)
-                        .getAsJsonObject();
-                out = new Bomb(new Position(posObj.get("x").getAsInt(), posObj.get("y").getAsInt()));
+                if (JConfig.isNotObject( obj.get("position"))) out = null;
+                else {
+                    Position position = MyGson.instance.fromJson(obj.get("position"), Position.class);
+                    out = new Bomb(position);
+                }
             }
             case BOMBER -> {
-                int position = obj.get("position").getAsInt();
-                Bomber.Direction direction = Bomber.Direction.valueOf(obj.get("direction").getAsString());
-                out = new Bomber(position, direction);
+                if (JConfig.isNotObject(obj.get("position"))) out = null;
+                else if (!obj.has("direction")) out = null;
+                else {
+                    Position position = MyGson.instance.fromJson(obj.get("position"), Position.class);
+                    Bomber.Direction direction = Bomber.Direction.valueOf(obj.get("direction").getAsString());
+                    out = new Bomber(position, direction);
+                }
             }
             case FARM -> {
-                List<Position> positions = obj
-                        .getAsJsonArray("positions")
-                        .asList()
-                        .stream()
-                        .map(el -> {
-                            JsonObject elObj = el.getAsJsonObject();
-                            return new Position(elObj.get("x").getAsInt(), elObj.get("y").getAsInt());
-                        })
-                        .toList();
-                out = new Farm(positions);
+                if (JConfig.isNotArray(obj.get("positions"))) out = null;
+                else {
+                    List<Position> positions = obj
+                            .getAsJsonArray("positions")
+                            .asList()
+                            .stream()
+                            .map(el -> {
+                                if (!el.isJsonObject()) return null;
+                                return MyGson.instance.fromJson(el.getAsJsonObject(), Position.class);
+                            })
+                            .filter(Objects::nonNull)
+                            .toList();
+                    out = new Farm(positions);
+                }
             }
             case RADAR -> {
-                JsonObject posObj = obj
-                        .getAsJsonArray("positions")
-                        .get(0)
-                        .getAsJsonObject();
-                out = new Radar(new Position(posObj.get("x").getAsInt(), posObj.get("y").getAsInt()));
+                if (JConfig.isNotObject(obj.get("position"))) out = null;
+                else {
+                    Position position = MyGson.instance.fromJson(obj.get("position"), Position.class);
+                    out = new Radar(position);
+                }
             }
             default -> out = null;
         }

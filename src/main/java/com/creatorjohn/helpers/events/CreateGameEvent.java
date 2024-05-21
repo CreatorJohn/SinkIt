@@ -1,8 +1,12 @@
 package com.creatorjohn.helpers.events;
 
-final public class CreateGameEvent extends Event implements ClientEvent {
+import com.creatorjohn.helpers.GameBoard;
 
-    public CreateGameEvent() {
+final public class CreateGameEvent extends Event implements ClientEvent {
+    final GameBoard.BoardSize size;
+
+    public CreateGameEvent(GameBoard.BoardSize size) {
         super(Type.CREATE_GAME);
+        this.size = size;
     }
 }

@@ -4,8 +4,7 @@ import com.creatorjohn.handlers.Client;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
+import java.awt.event.*;
 
 abstract class Screen {
     final private JFrame frame;
@@ -62,10 +61,14 @@ abstract class Screen {
     }
 
     void navigateTo(Screen target) {
+        navigateTo(target, null);
+    }
+
+    void navigateTo(Screen target, GridBagConstraints constraints) {
         target.setPrevScreen(this);
         frame.removeWindowListener(wl);
         frame.addWindowListener(target.wl);
-        frame.add(target.instance);
+        frame.add(target.instance, constraints);
         frame.remove(instance);
         updateContent();
     }

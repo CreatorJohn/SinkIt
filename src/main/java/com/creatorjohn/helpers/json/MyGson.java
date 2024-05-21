@@ -1,10 +1,9 @@
 package com.creatorjohn.helpers.json;
 
-import com.creatorjohn.db.models.DataModel;
 import com.creatorjohn.helpers.Position;
-import com.creatorjohn.helpers.Ship;
+import com.creatorjohn.helpers.entities.Ship;
 import com.creatorjohn.helpers.events.Event;
-import com.creatorjohn.helpers.powerups.PowerUp;
+import com.creatorjohn.helpers.entities.PowerUp;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 

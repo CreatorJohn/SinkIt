@@ -1,14 +1,15 @@
 package com.creatorjohn.helpers.server;
 
 import com.creatorjohn.db.models.UserModel;
+import com.creatorjohn.db.models.UserStats;
 import com.creatorjohn.handlers.Server;
 import com.creatorjohn.helpers.JConfig;
 import com.creatorjohn.helpers.Position;
-import com.creatorjohn.helpers.Ship;
+import com.creatorjohn.helpers.entities.Ship;
 import com.creatorjohn.helpers.events.*;
 import com.creatorjohn.helpers.json.MyGson;
 import com.creatorjohn.helpers.logging.MyLogger;
-import com.creatorjohn.helpers.powerups.PowerUp;
+import com.creatorjohn.helpers.entities.PowerUp;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -18,6 +19,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.List;
+import java.util.Objects;
 
 public class Player {
     static final private MyLogger logger = new MyLogger("Player");
@@ -25,6 +27,7 @@ public class Player {
     final private Socket instance;
     final private PrintWriter out;
     final private BufferedReader in;
+    private final String ip;
     private boolean connected;
     private String gameID;
     private Thread thread;
@@ -46,11 +49,16 @@ public class Player {
         this.out = new PrintWriter(instance.getOutputStream(), true);
         this.in = new BufferedReader(new InputStreamReader(instance.getInputStream()));
         this.connected = true;
+        this.ip = instance.getRemoteSocketAddress().toString();
         this.listen();
     }
 
     public String id() {
         return id;
+    }
+
+    public String ip() {
+        return ip;
     }
 
     public boolean inGame() {
@@ -114,7 +122,7 @@ public class Player {
                             Server.Result result = server.createGame(this);
 
                             switch (result) {
-                                case Server.Result.Error ignored1 -> {}
+                                case Server.Result.Error ignored1 -> sendEvent(new GameCreatedEvent(""));
                                 case Server.Result.Success<?> success -> {
                                     this.gameID = JConfig.convert(success.data, String.class);
 
@@ -126,15 +134,15 @@ public class Player {
                         case JoinGameEvent ev -> {
                             if (!isLogged()) {
                                 logger.warning("Player is not logged in!");
-                                sendEvent(new GameJoinedEvent(List.of(), List.of(), List.of(), List.of(), false));
+                                sendEvent(new GameJoinedEvent(false));
                                 break;
                             } else if (inGame()) {
                                 logger.warning("Player is already in game!");
-                                sendEvent(new GameJoinedEvent(List.of(), List.of(), List.of(), List.of(), false));
+                                sendEvent(new GameJoinedEvent(false));
                                 break;
                             } else if (ev.gameID == null) {
                                 logger.severe("Invalid gameID!");
-                                sendEvent(new GameJoinedEvent(List.of(), List.of(), List.of(), List.of(), false));
+                                sendEvent(new GameJoinedEvent(false));
                                 break;
                             }
 
@@ -142,13 +150,13 @@ public class Player {
 
                             if (game == null) {
                                 logger.severe("Game doesn't exist!");
-                                sendEvent(new GameJoinedEvent(List.of(), List.of(), List.of(), List.of(), false));
+                                sendEvent(new GameJoinedEvent(false));
                                 break;
                             }
 
                             if (game.addPlayer(this)) this.gameID = game.id();
                             else {
-                                sendEvent(new GameJoinedEvent(List.of(), List.of(), List.of(), List.of(), false));
+                                sendEvent(new GameJoinedEvent(false));
                                 return;
                             }
 
@@ -156,18 +164,33 @@ public class Player {
 
                             if (enemy == null) {
                                 logger.severe("Enemy not found!");
-                                sendEvent(new GameJoinedEvent(List.of(), List.of(), List.of(), List.of(), false));
+                                sendEvent(new GameJoinedEvent(false));
                                 break;
                             }
 
-                            enemy.sendEvent(new PlayerJoinedEvent());
-                            System.out.println("Player " + id() + " joined the game!");
+                            enemy.sendEvent(new PlayerJoinedEvent(username));
+                            logger.info("Player " + id() + " joined the game!");
 
-                            List<Ship> loadedShips = game.ships(id());
-                            List<PowerUp> loadedPowerUps = game.powerUps(id());
-                            List<Position> loadedShotTiles = game.shotTiles(id());
-                            List<Position> loadedRevealedTiles = game.shotTiles(enemy.id());
-                            sendEvent(new GameJoinedEvent(loadedShips, loadedPowerUps, loadedShotTiles, loadedRevealedTiles, true));
+                            List<Ship> myShips = game.ships(id);
+                            List<Ship> enemyShips = game.ships(enemy.id);
+
+                            sendEvent(new GameJoinedEvent(new GameJoinedEvent.ShipInfo(myShips, enemyShips), true));
+
+                            if (game.state() == Game.State.RUNNING) {
+                                String currentPlayer = game.currentPlayer().username;
+                                GameUpdatedEvent.PowerUpsInfo pInfo = new GameUpdatedEvent.PowerUpsInfo(
+                                        game.powerUps(id),
+                                        game.powerUps(enemy.id)
+                                );
+                                GameUpdatedEvent.ShotTilesInfo sInfo = new GameUpdatedEvent.ShotTilesInfo(
+                                        game.shotTiles(id),
+                                        game.shotTiles(enemy.id)
+                                );
+                                sendEvent(new GameUpdatedEvent(currentPlayer, pInfo, sInfo, List.of(), true));
+                            }
+                        }
+                        case LogoutEvent ignored -> {
+                            if (server.disconnectPlayer(this)) System.out.println("Player disconnected!");
                         }
                         case DisconnectEvent ignored -> {
                             if (!isLogged()) {
@@ -208,20 +231,40 @@ public class Player {
                             if (game == null) {
                                 logger.severe("Game not found!");
                                 sendEvent(new GameInitializedEvent(false));
+                                break;
                             } else if (!game.initialize(this, ev.ships)) {
                                 logger.severe("Failed to initialize game: " + game.id());
                                 sendEvent(new GameInitializedEvent(false));
+                                break;
                             } else sendEvent(new GameInitializedEvent(true));
+
+                            Player enemy;
+                            if (game.state() == Game.State.RUNNING && (enemy = game.enemy(id)) != null) {
+                                System.out.println("Game running and enemy found!");
+                                List<Ship> myShips = game.ships(id);
+                                List<Ship> enemyShips = game.ships(enemy.id);
+
+                                sendEvent(new GameUpdatedEvent(game.currentPlayer().username,
+                                        new GameUpdatedEvent.PowerUpsInfo(),
+                                        new GameUpdatedEvent.ShotTilesInfo(),
+                                        enemyShips,
+                                        true));
+                                enemy.sendEvent(new GameUpdatedEvent(game.currentPlayer().username,
+                                        new GameUpdatedEvent.PowerUpsInfo(),
+                                        new GameUpdatedEvent.ShotTilesInfo(),
+                                        myShips,
+                                        true));
+                            }
                         }
                         case UpdateGameEvent ev -> {
                             if (!isLogged()) {
                                 logger.warning("Player is not logged in!");
-                                sendEvent(new GameUpdatedEvent(username, List.of(), List.of(), false));
+                                sendEvent(new GameUpdatedEvent(username, new GameUpdatedEvent.PowerUpsInfo(), new GameUpdatedEvent.ShotTilesInfo(), List.of(), false));
                                 break;
                             }
                             if (!inGame()) {
                                 logger.warning("Player is not in game!");
-                                sendEvent(new GameUpdatedEvent(username, List.of(), List.of(), false));
+                                sendEvent(new GameUpdatedEvent(username, new GameUpdatedEvent.PowerUpsInfo(), new GameUpdatedEvent.ShotTilesInfo(), List.of(), false));
                                 break;
                             }
 
@@ -229,29 +272,63 @@ public class Player {
 
                             if (game == null) {
                                 logger.severe("Game not found!");
-                                sendEvent(new GameUpdatedEvent(username, List.of(), List.of(), false));
+                                sendEvent(new GameUpdatedEvent(username, new GameUpdatedEvent.PowerUpsInfo(), new GameUpdatedEvent.ShotTilesInfo(), List.of(), false));
+                            } else if (!Objects.equals(id, game.currentPlayer().id)) {
+                                logger.warning("Not your turn!");
+                                sendEvent(new GameUpdatedEvent(game.currentPlayer().username, new GameUpdatedEvent.PowerUpsInfo(), new GameUpdatedEvent.ShotTilesInfo(), List.of(), false));
+                            } else if (game.enemy(id) == null) {
+                                logger.severe("Enemy not found!");
+                                sendEvent(new GameUpdatedEvent(username, new GameUpdatedEvent.PowerUpsInfo(), new GameUpdatedEvent.ShotTilesInfo(), List.of(), false));
                             } else if (!game.update(this, ev.usedPowerUps, ev.tilesShot)) {
                                 logger.severe("Game not updated!");
-                                sendEvent(new GameUpdatedEvent(username, game.powerUps(id()), game.shotTiles(id()), false));
+                                sendEvent(new GameUpdatedEvent(username, new GameUpdatedEvent.PowerUpsInfo(), new GameUpdatedEvent.ShotTilesInfo(), List.of(), false));
                             } else {
                                 Player enemy = game.enemy(id());
 
-                                if (enemy == null) {
-                                    logger.severe("Enemy not found!");
-                                    sendEvent(new GameUpdatedEvent(username, game.powerUps(id()), game.shotTiles(id()), false));
-                                } else {
-                                    sendEvent(new GameUpdatedEvent(username, game.powerUps(id()), game.shotTiles(id()), true));
-                                    enemy.sendEvent(new GameUpdatedEvent(enemy.username, game.powerUps(enemy.id()), game.shotTiles(enemy.id()), true));
+                                game.updateCurrentPlayer();
+                                GameUpdatedEvent.PowerUpsInfo pInfo = new GameUpdatedEvent.PowerUpsInfo(List.of(), ev.usedPowerUps);
+                                GameUpdatedEvent.ShotTilesInfo sInfo = new GameUpdatedEvent.ShotTilesInfo(List.of(), ev.tilesShot);
+                                enemy.sendEvent(new GameUpdatedEvent(game.currentPlayer().username, pInfo, sInfo, List.of(), true));
+
+                                if (ev.gameOver) {
+                                    sendEvent(new GameFinishedEvent(GameFinishedEvent.Status.WINNER));
+                                    enemy.sendEvent(new GameFinishedEvent(GameFinishedEvent.Status.LOOSER));
+
+                                    UserStats playerStats = server.getPlayerStats(id);
+                                    UserStats enemyStats = server.getPlayerStats(enemy.id);
+
+                                    if (playerStats != null) {
+                                        playerStats.updateGamesWonBy(1);
+                                        if (server.updatePlayerStats(id, playerStats))
+                                            logger.info("Player stats successfully updated!");
+                                    }
+
+                                    if (enemyStats != null) {
+                                        enemyStats.updateGamesLostBy(1);
+                                        if (server.updatePlayerStats(enemy.id, enemyStats))
+                                            logger.info("Enemy stats successfully updated!");
+                                    }
                                 }
                             }
+                        }
+                        case StatisticsRequestEvent ignored -> {
+                            if (!isLogged()) {
+                                logger.warning("Player is not logged in!");
+                                sendEvent(new StatisticsResponseEvent(null));
+                                break;
+                            }
+
+                            sendEvent(new StatisticsResponseEvent(server.getPlayerStats(id)));
                         }
                         case null, default -> logger.warning("Unknown event!");
                     }
                 }
             } catch (SocketException e) {
                 logger.warning(e.getLocalizedMessage());
+                if (server.disconnectPlayer(this)) System.out.println("Player is disconnected!");;
             } catch (IOException e) {
                 logger.severe(e.getLocalizedMessage());
+                if (server.disconnectPlayer(this)) System.out.println("Player is disconnected!");;
             }
         });
         thread.start();

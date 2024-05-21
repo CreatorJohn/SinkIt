@@ -4,16 +4,16 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.net.URL;
+
+import static com.creatorjohn.helpers.JConfig.*;
 
 public class JRegister extends JPanel {
+    private Thread waitingThread;
 
     public JRegister(JFrame frame, Config config) {
         this.setOpaque(false);
         this.setLayout(new GridLayout(0, 1, 10, 0));
-        Font labelFont = new Font("Arial", Font.BOLD, 24);
-        Font fieldFont = new Font("Arial", Font.PLAIN, 18);
-        Font buttonFont = new Font("Arial", Font.BOLD, 18);
-        Insets buttonInsets = new Insets(5, 5, 5, 5);
 
         JPanel usernameRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         usernameRow.setOpaque(false);
@@ -138,17 +138,28 @@ public class JRegister extends JPanel {
         registerButton.setFont(buttonFont);
         registerButton.setFocusPainted(false);
         registerButton.addActionListener(e -> {
-            String username = usernameField.getText();
-            String password = new String(passwordField.getPassword());
-            String rePassword = new String(rePasswordField.getPassword());
-            String error = config.register(username, password, rePassword);
+            if (waitingThread != null) return;
 
-            if (error != null && !error.isBlank()) JOptionPane.showMessageDialog(frame, error.trim(), "Register error", JOptionPane.ERROR_MESSAGE);
-            else {
-                usernameField.setText("");
-                passwordField.setText("");
-                rePasswordField.setText("");
-            }
+            waitingThread = new Thread(() -> {
+                URL iconUrl = getClass().getResource("/assets/loader32.gif");
+
+                if (iconUrl != null) registerButton.setIcon(new ImageIcon(iconUrl));
+
+                String username = usernameField.getText();
+                String password = new String(passwordField.getPassword());
+                String rePassword = new String(rePasswordField.getPassword());
+                String error = config.register(username, password, rePassword);
+
+                if (error != null && !error.isBlank()) JOptionPane.showMessageDialog(frame, error.trim(), "Register error", JOptionPane.ERROR_MESSAGE);
+                else {
+                    usernameField.setText("");
+                    passwordField.setText("");
+                    rePasswordField.setText("");
+                }
+                waitingThread = null;
+                registerButton.setIcon(null);
+            });
+            waitingThread.start();
         });
         c.insets.set(0, 0, 0, 5);
         c.gridx = 0;

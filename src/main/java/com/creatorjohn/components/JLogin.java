@@ -1,22 +1,21 @@
 package com.creatorjohn.components;
 
-import net.miginfocom.layout.CC;
-import net.miginfocom.swing.MigLayout;
+import com.creatorjohn.helpers.JLock;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.net.URL;
+
+import static com.creatorjohn.helpers.JConfig.*;
 
 public class JLogin extends JPanel {
+    private Thread waitingThread;
 
     public JLogin(JFrame frame, Config config) {
         this.setLayout(new GridLayout(0, 1, 10, 0));
         this.setOpaque(false);
-        Font labelFont = new Font("Arial", Font.BOLD, 24);
-        Font fieldFont = new Font("Arial", Font.PLAIN, 18);
-        Font buttonFont = new Font("Arial", Font.BOLD, 18);
-        Insets buttonInsets = new Insets(5, 5, 5, 5);
 
         JTextField usernameField = new JTextField(20);
         usernameField.setFont(fieldFont);
@@ -89,13 +88,24 @@ public class JLogin extends JPanel {
         loginButton.setFont(buttonFont);
         loginButton.setFocusPainted(false);
         loginButton.addActionListener(e -> {
-            String error = config.login(usernameField.getText(), new String(passwordField.getPassword()));
+            if (waitingThread != null) return;
 
-            if (error != null && !error.isBlank()) JOptionPane.showMessageDialog(frame, error.trim(), "Login error", JOptionPane.ERROR_MESSAGE);
-            else {
-                usernameField.setText("");
-                passwordField.setText("");
-            }
+            waitingThread = new Thread(() -> {
+                URL iconUrl = getClass().getResource("/assets/loader32.gif");
+
+                if (iconUrl != null) loginButton.setIcon(new ImageIcon(iconUrl));
+
+                String error = config.login(usernameField.getText(), new String(passwordField.getPassword()));
+
+                if (error != null && !error.isBlank()) JOptionPane.showMessageDialog(frame, error.trim(), "Login error", JOptionPane.ERROR_MESSAGE);
+                else {
+                    usernameField.setText("");
+                    passwordField.setText("");
+                }
+                waitingThread = null;
+                loginButton.setIcon(null);
+            });
+            waitingThread.start();
         });
 
         JButton registerButton = new JButton("Register");
