@@ -4,6 +4,7 @@ target/
 !**/src/test/**/target/
 /src/main/java/com/creatorjohn/db/data/**/*.*
 out/
+db/
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
