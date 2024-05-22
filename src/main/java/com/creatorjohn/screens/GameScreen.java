@@ -185,10 +185,8 @@ public class GameScreen extends Screen {
             if (enemyGame.ship(pos) == null) enemyBoard.destroy(List.of(pos));
             else enemyBoard.destroyShip(List.of(pos));
         });
-        enemyGame.onGameOver(() -> {
-            System.out.println("Shot tiles winning: " + shotTiles);
-            client.sendEvent(new UpdateGameEvent(shotTiles, usedPowerUps, true));
-        });
+        enemyGame.onGameOver(() -> client.sendEvent(new UpdateGameEvent(shotTiles, usedPowerUps, true)));
+        enemyGame.onBombShot(pos -> myGame.shootTile(pos.x(), pos.y()));
         powerUpPicker.onSelected(selected -> {
             if (selected == null) priceText.setText("Power-up price: -");
             else priceText.setText("Power-up price: " + selected.getCost(size, maxShipSize));

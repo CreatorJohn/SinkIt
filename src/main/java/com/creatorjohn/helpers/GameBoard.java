@@ -1,31 +1,31 @@
 package com.creatorjohn.helpers;
 
-import com.creatorjohn.db.models.UserModel;
-import com.creatorjohn.helpers.events.UpdateGameEvent;
 import com.creatorjohn.helpers.entities.*;
+import com.creatorjohn.helpers.events.UpdateGameEvent;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public class GameBoard {
+    final ArrayList<PowerUp> powerUps = new ArrayList<>();
+    final ArrayList<Ship> ships = new ArrayList<>();
+    final int size;
     final private ArrayList<Position> shipsPos = new ArrayList<>();
     final private ArrayList<Position> powerUpsPos = new ArrayList<>();
     final private List<DetailedPosition> allPositions;
     final private BoardSize boardSize;
     final private BoardType boardType;
     final private int maxShipSize;
-    final ArrayList<PowerUp> powerUps = new ArrayList<>();
-    final ArrayList<Ship> ships = new ArrayList<>();
     private Consumer<Integer> onTokensChanged;
     private Consumer<Position> onShoot;
+    private Predicate<Position> onBombShot;
     private Runnable onGameOver;
     private boolean gameOver = false;
     private int shootCounter = 0;
     private int shipCounter = 0;
     private int tokens = 0;
-    final int size;
 
     public GameBoard(BoardSize boardSize, BoardType boardType, int maxShipSize) {
         this.boardSize = boardSize;
@@ -51,6 +51,14 @@ public class GameBoard {
         this.allPositions = positions;
     }
 
+    public static int shipCount(@NotNull BoardSize size) {
+        return switch (size) {
+            case SMALL -> JConfig.smallMapShipCount;
+            case MEDIUM -> JConfig.mediumMapShipCount;
+            case BIG -> JConfig.bigMapShipCount;
+        };
+    }
+
     public void onShoot(Consumer<Position> onShoot) {
         this.onShoot = onShoot;
     }
@@ -59,12 +67,8 @@ public class GameBoard {
         this.onGameOver = onGameOver;
     }
 
-    public static int shipCount(@NotNull BoardSize size) {
-        return switch (size) {
-            case SMALL -> JConfig.smallMapShipCount;
-            case MEDIUM -> JConfig.mediumMapShipCount;
-            case BIG -> JConfig.bigMapShipCount;
-        };
+    public void onBombShot(Predicate<Position> onBombShot) {
+        this.onBombShot = onBombShot;
     }
 
     public boolean updateGameBoard(UpdateGameEvent event) {
@@ -109,7 +113,7 @@ public class GameBoard {
     }
 
     public Ship removeShip(@NotNull Position position) {
-        return  removeShip(position, false);
+        return removeShip(position, false);
     }
 
     public Ship removeShip(@NotNull Position position, boolean force) {
@@ -166,13 +170,12 @@ public class GameBoard {
             powerUps.remove(bomb);
 
             if (!force) for (int i = 0; i < 3; i++) {
-                int maxIndex = (int) allPositions.stream().filter(it -> !it.revealed()).count();
-
-                if (maxIndex == 0) break;
+                int maxIndex = size * size - 1;
 
                 int randomIndex = new Random().nextInt(maxIndex);
                 Position randomPos = allPositions.get(randomIndex).position();
-                shootTile(randomPos.x(), randomPos.y());
+
+                if (onBombShot != null && !onBombShot.test(randomPos)) index--;
             }
         }
 
@@ -242,7 +245,8 @@ public class GameBoard {
         switch (powerUp) {
             case Bomb bomb -> success = boardType == BoardType.MY && emptyHiddenPositions.contains(bomb.position());
             case Farm farm -> success = boardType == BoardType.MY && emptyHiddenPositions.containsAll(farm.positions());
-            case Radar radar -> success = boardType == BoardType.ENEMY && emptyRevealedPositions.contains(radar.position());
+            case Radar radar ->
+                    success = boardType == BoardType.ENEMY && emptyRevealedPositions.contains(radar.position());
             case Bomber ignored -> success = boardType == BoardType.ENEMY;
             default -> success = false;
         }
@@ -361,8 +365,9 @@ public class GameBoard {
         return shipsPos.isEmpty();
     }
 
-    public enum BoardSize { SMALL, MEDIUM, BIG }
-    public enum BoardType { MY, ENEMY }
+    public enum BoardSize {SMALL, MEDIUM, BIG}
+
+    public enum BoardType {MY, ENEMY}
 
     public record DetailedPosition(Position position, boolean revealed) {
         Position toPosition() {
