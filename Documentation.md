@@ -92,7 +92,7 @@
         | Bomb     | &#9989;  | &#10060;    | When enemy shoot your bomb, it will reveal three squares on enemies board |
         | Farm     | &#9989;  | &#10060;    | For each surrounding tile, where ship is placed, generates 1 bonus token. When part of farm is destroyed, or surrounding ship is destroyed, bonus token production is decreased |
 
-        You Game is over, when one of the players doesn't have any tiles covered by ship left.
+        Game is over, when one of the players doesn't have any tiles covered by ship left.
     
     <br>
 
