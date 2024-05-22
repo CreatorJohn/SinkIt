@@ -140,7 +140,10 @@ public class GameScreen extends Screen {
             };
             usedPowerUps.add(selectedPowerUp);
         });
-        myGame.onTokensChanged(tokens -> tokenText.setText("Tokens: " + tokens));
+        myGame.onTokensChanged(tokens -> {
+            tokenText.setText("Tokens: " + tokens);
+            enemyGame.setTokens(tokens);
+        });
         myGame.onShoot(pos -> {
             if (myGame.ship(pos) == null) myBoard.destroy(List.of(pos));
             else myBoard.destroyShip(List.of(pos));
@@ -187,6 +190,10 @@ public class GameScreen extends Screen {
         });
         enemyGame.onGameOver(() -> client.sendEvent(new UpdateGameEvent(shotTiles, usedPowerUps, true)));
         enemyGame.onBombShot(pos -> myGame.shootTile(pos.x(), pos.y()));
+        enemyGame.onTokensChanged(tokens -> {
+            tokenText.setText("Tokens: " + tokens);
+            myGame.setTokens(tokens);
+        });
         powerUpPicker.onSelected(selected -> {
             if (selected == null) priceText.setText("Power-up price: -");
             else priceText.setText("Power-up price: " + selected.getCost(size, maxShipSize));
@@ -221,8 +228,6 @@ public class GameScreen extends Screen {
             }
 
             currentPlayer = event.currentPlayer;
-            System.out.println("Game updated...");
-            System.out.println("Current player: " + currentPlayer);
 
             instance.remove(currentPlayerText);
 
@@ -245,12 +250,6 @@ public class GameScreen extends Screen {
 
                 gameConfirmButton.setText("Waiting...");
             }
-
-            System.out.println("Incoming my shot tiles: " + event.shotTiles.my());
-            System.out.println("Incoming enemy shot tiles: " + event.shotTiles.enemy());
-            System.out.println("Incoming my power-ups: " + event.powerUps.my());
-            System.out.println("Incoming enemy power-ups: " + event.powerUps.enemy());
-            System.out.println("Incoming ships: " + event.ships);
 
             List<Ship> loadedShips = enemyGame.ships();
 
