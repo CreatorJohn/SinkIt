@@ -74,10 +74,10 @@
         On this screen you will see board matching the size you selected in **Menu screen**. Select your favorite ship under the board. When you hover over any tile in board, some of them will lighten up. It indicates where ship will be placed. Ships can touch each other by their side, but can't cover each other. With `Left click` you can place the ship. With `Right click` you can remove the ship. After placing required amount of ships, press **Confirm button**.
         
         | Board size | Required count of placed ships |
-        | ---------- | ----------------------- |
-        | `Small`    | 5                       |
-        | `Medium`   | 8                       |
-        | `Big`      | 11                      |
+        |------------|--------------------------------|
+        | `Small`    | 8                              |
+        | `Medium`   | 11                             |
+        | `Big`      | 14                             |
     
     <br>
 
@@ -85,11 +85,11 @@
 
         When other player setup their game starting player has been randomly chosen. In each turn you can shoot 5 times. Shooting don't cost you tokens. Besides shooting you can use as many power-ups as your token count allows you. Each power-up has different usage.
 
-        | Power-up | My board | Enemy board | Usage |
-        | -------- | -------- | ----------- | ----- |
-        | Bomber   | &#10060; | &#9989;     | Reveals row or column in enemies board (You can choose between row and column by pressing `SHIFT`) |
-        | Radar    | &#10060; | &#9989;     | Can be placed only on empty revealed tiles. It reveals 3x3 area on enemy board |
-        | Bomb     | &#9989;  | &#10060;    | When enemy shoot your bomb, it will reveal three squares on enemies board |
+        | Power-up | My board | Enemy board | Usage                                                                                                                                                                           |
+        |----------|----------|-------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+        | Bomber   | &#10060; | &#9989;     | Reveals row or column in enemies board (You can choose between row and column by pressing `SHIFT`)                                                                              |
+        | Radar    | &#10060; | &#9989;     | Can be placed only on empty revealed tiles. It reveals 3x3 area on enemy board                                                                                                  |
+        | Bomb     | &#9989;  | &#10060;    | When enemy shoot your bomb, it will reveal three squares on enemies board                                                                                                       |
         | Farm     | &#9989;  | &#10060;    | For each surrounding tile, where ship is placed, generates 1 bonus token. When part of farm is destroyed, or surrounding ship is destroyed, bonus token production is decreased |
 
         Game is over, when one of the players doesn't have any tiles covered by ship left.

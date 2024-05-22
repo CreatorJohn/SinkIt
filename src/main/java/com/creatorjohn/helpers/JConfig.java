@@ -18,8 +18,8 @@ public class JConfig {
     public static Insets buttonInsets = new Insets(5, 5, 5, 5);
     public static int maxShipSize = 5;
     public static int maxShots = 5;
-    //    public static int smallMapShipCount = 8;
-    public static int smallMapShipCount = 1;
+        public static int smallMapShipCount = 8;
+//    public static int smallMapShipCount = 1;
     public static int mediumMapShipCount = 11;
     public static int bigMapShipCount = 14;
     public static String serverAddress = "164.92.171.44";

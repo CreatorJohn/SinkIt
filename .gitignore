@@ -3,7 +3,7 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 /src/main/java/com/creatorjohn/db/data/**/*.*
-out/
+out/artifacts/SinkIt_server/
 db/
 
 ### IntelliJ IDEA ###
